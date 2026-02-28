@@ -1,0 +1,12 @@
+[
+  { "id": "HHM-001", "age": 52, "health_status": "ارتفاع ضغط", "clinic_location": "منى 1", "risk_level": "متوسطة" },
+  { "id": "HHM-002", "age": 67, "health_status": "ألم صدري حاد", "clinic_location": "عرفات", "risk_level": "حرجة" },
+  { "id": "HHM-003", "age": 39, "health_status": "إجهاد حراري", "clinic_location": "مزدلفة", "risk_level": "منخفضة" },
+  { "id": "HHM-004", "age": 61, "health_status": "سكري غير منضبط", "clinic_location": "منى 2", "risk_level": "متوسطة" },
+  { "id": "HHM-005", "age": 45, "health_status": "جفاف متوسط", "clinic_location": "منى 3", "risk_level": "منخفضة" },
+  { "id": "HHM-006", "age": 70, "health_status": "قصور قلبي", "clinic_location": "منى", "risk_level": "حرجة" },
+  { "id": "HHM-007", "age": 33, "health_status": "إصابة قدم", "clinic_location": "الجمرات", "risk_level": "منخفضة" },
+  { "id": "HHM-008", "age": 58, "health_status": "ذبحة صدرية", "clinic_location": "عرفات", "risk_level": "متوسطة" },
+  { "id": "HHM-009", "age": 49, "health_status": "ربو حاد", "clinic_location": "منى 1", "risk_level": "متوسطة" },
+  { "id": "HHM-010", "age": 63, "health_status": "سكتة دماغية مشتبه بها", "clinic_location": "منى", "risk_level": "حرجة" }
+]
