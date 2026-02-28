@@ -1,125 +1,35 @@
-"use client"
-
-export const dynamic = "force-dynamic"
-
-import { useEffect, useMemo, useState } from "react"
-
-function normalizeRisk(v) {
-  const x = String(v ?? "")
-  if (x.includes("حرج")) return "critical"
-  if (x.includes("متوسط")) return "medium"
-  return "low"
-}
-
-export default function Home() {
-
-  const [pilgrims, setPilgrims] = useState([])
-  const [events, setEvents] = useState([])
-
-  useEffect(() => {
-    fetch("/api/pilgrims", { cache: "no-store" })
-      .then(r => r.json())
-      .then(setPilgrims)
-      .catch(() => setPilgrims([]))
-
-    fetch("/api/events", { cache: "no-store" })
-      .then(r => r.json())
-      .then(setEvents)
-      .catch(() => setEvents([]))
-  }, [])
-
-  const national = useMemo(() => {
-
-    let critical = 0
-    let medium = 0
-
-    for (const p of pilgrims) {
-      const r = normalizeRisk(p.risk)
-      if (r === "critical") critical++
-      if (r === "medium") medium++
-    }
-
-    const score = 100 - (critical * 2.5) - (medium * 1.2)
-
-    return {
-      readiness: Math.max(0, Math.round(score)),
-      critical,
-      medium,
-      alerts: events.filter(e => e.type === "ALERT_RAISED").length
-    }
-
-  }, [pilgrims, events])
-
-  const level =
-    national.readiness >= 90 ? "مستقر"
-    : national.readiness >= 75 ? "مراقبة"
-    : "تأهب"
-
+export default function Dashboard() {
   return (
-    <main style={{ display: "grid", gap: 24 }}>
+    <div>
+      <h2 className="section-title mb-6">
+        National Health Overview
+      </h2>
 
-      <div className="sectionTitle">
-        غرفة العمليات الوطنية للحج
-      </div>
-
-      {/* الشريط السيادي */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 16 }}>
+      <div className="grid grid-cols-4 gap-6">
 
         <div className="card">
-          <div>🇸🇦 مؤشر صحة الحج الوطني</div>
-          <div style={{ fontSize: 34, fontWeight: 900 }}>
-            {national.readiness}%
-          </div>
+          <p className="text-sm text-gray-400">Total Pilgrims</p>
+          <h3 className="text-3xl font-bold mt-2">1,845,000</h3>
         </div>
 
         <div className="card">
-          <div>🚨 مستوى التأهب</div>
-          <div style={{ fontSize: 22, fontWeight: 900 }}>
-            {level}
-          </div>
+          <p className="text-sm text-gray-400">Active Alerts</p>
+          <h3 className="text-3xl font-bold text-red-400 mt-2">32</h3>
         </div>
 
         <div className="card">
-          <div>⚠️ الحالات الحرجة</div>
-          <div style={{ fontSize: 22, fontWeight: 900 }}>
-            {national.critical}
-          </div>
+          <p className="text-sm text-gray-400">Critical Cases</p>
+          <h3 className="text-3xl font-bold text-yellow-400 mt-2">8</h3>
         </div>
 
         <div className="card">
-          <div>🟡 الحالات المتوسطة</div>
-          <div style={{ fontSize: 22, fontWeight: 900 }}>
-            {national.medium}
-          </div>
+          <p className="text-sm text-gray-400">System Status</p>
+          <h3 className="text-3xl font-bold text-green-400 mt-2">
+            Operational
+          </h3>
         </div>
 
       </div>
-
-      {/* محرك القرار */}
-      <div className="card" style={{ padding: 24 }}>
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>
-          🧠 محرك القرار الوطني
-        </div>
-        <div style={{ opacity: 0.85 }}>
-          إذا استمر الاتجاه الحالي، سيبقى الوضع مستقر خلال 30 دقيقة القادمة.
-          يوصى بمتابعة قطاع منى 1 كأكثر القطاعات حساسية.
-        </div>
-      </div>
-
-      {/* سجل الأحداث */}
-      <div className="card">
-        <div style={{ fontWeight: 900, marginBottom: 10 }}>
-          📜 آخر الأحداث التشغيلية
-        </div>
-        <div style={{ display: "grid", gap: 8 }}>
-          {events.slice(0,5).map((e,i)=>(
-            <div key={i} style={{ opacity:0.8 }}>
-              {e.type} — {e.sector} — {new Date(e.ts).toLocaleTimeString()}
-            </div>
-          ))}
-        </div>
-      </div>
-
-    </main>
+    </div>
   )
 }
