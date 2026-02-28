@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import { useEffect, useState } from "react"
 
 export default function MapPage() {
@@ -18,7 +20,7 @@ export default function MapPage() {
       <div className="sectionTitle">الخريطة التشغيلية</div>
 
       <div className="card">
-        <div style={{ fontWeight: 900 }}>عدد الحالات المعروضة: {data.length}</div>
+        عدد الحالات: {data.length}
       </div>
 
       <div style={{ marginTop: 20 }}>
