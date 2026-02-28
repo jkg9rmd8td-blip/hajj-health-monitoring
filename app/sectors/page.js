@@ -1,129 +1,255 @@
 "use client"
-import { useEffect, useMemo, useState } from "react"
 
-function norm(v){ const x=String(v??"").trim(); if(x.includes("حرج"))return"critical"; if(x.includes("متوسط"))return"medium"; return"low"; }
-function idx(t,c,m){ if(!t)return 100; let s=100-Math.round((c/t)*100*1.25)-Math.round((m/t)*100*0.55); return Math.max(0,Math.min(100,s)); }
-function band(s){ if(s>=85)return{t:"مستقر",cls:"green"}; if(s>=70)return{t:"مراقبة",cls:"amber"}; return{t:"تأهب",cls:"red"}; }
+import { useEffect, useMemo, useRef, useState } from "react"
 
-export default function Sectors(){
-  const [data,setData]=useState([])
-  const [resources,setResources]=useState([])
-  const [pick,setPick]=useState(null)
+/* ===========================
+   UTILITIES
+=========================== */
 
-  useEffect(()=>{
-    fetch("/api/pilgrims",{cache:"no-store"}).then(r=>r.json()).then(x=>setData(Array.isArray(x)?x:[])).catch(()=>setData([]))
-    fetch("/api/resources",{cache:"no-store"}).then(r=>r.json()).then(x=>setResources(Array.isArray(x)?x:[])).catch(()=>setResources([]))
-  },[])
+function clamp(n, a, b) {
+  if (!isFinite(n)) return null
+  return Math.max(a, Math.min(b, n))
+}
+function num(v) {
+  const x = Number(v)
+  return isFinite(x) ? x : null
+}
+function sanitizeHR(v) { return clamp(num(v), 35, 200) }
+function sanitizeTemp(v) { return clamp(num(v), 34, 41.5) }
+function sanitizeHyd(v) { return clamp(num(v), 0, 100) }
 
-  const sectors = useMemo(()=>{
-    const map=new Map()
-    for(const p of data){
-      const s=String(p.clinic_location??p.location??"غير محدد")
-      const r=norm(p.risk_level??p.risk)
-      const e=map.get(s)??{sector:s,total:0,critical:0,medium:0,low:0,sample:[]}
-      e.total++; e[r]++; if(e.sample.length<4) e.sample.push(p)
-      map.set(s,e)
+function normalizeRiskArabic(v) {
+  const x = String(v ?? "").trim()
+  if (x.includes("حرج")) return "critical"
+  if (x.includes("متوسط")) return "medium"
+  return "low"
+}
+
+function readinessIndex(total, critical, medium) {
+  if (!total) return 100
+  const c = (critical / total) * 100
+  const m = (medium / total) * 100
+  let score = 100 - Math.round(c * 1.25) - Math.round(m * 0.55)
+  return Math.max(0, Math.min(100, score))
+}
+
+function band(score) {
+  if (score >= 85) return { label: "مستقر", cls: "green" }
+  if (score >= 70) return { label: "مراقبة", cls: "amber" }
+  return { label: "تأهب", cls: "red" }
+}
+
+function percentile(arr, p) {
+  if (!arr.length) return null
+  const sorted = [...arr].sort((a, b) => a - b)
+  const idx = Math.floor((p / 100) * (sorted.length - 1))
+  return sorted[idx]
+}
+
+/* ===========================
+   MAPPING SECTOR → CLUSTER
+=========================== */
+
+function getCluster(sector) {
+  if (!sector) return "غرفة وطنية"
+  if (sector.includes("منى")) return "تجمع مكة"
+  if (sector.includes("عرفات")) return "تجمع عرفات"
+  if (sector.includes("مزدلفة")) return "تجمع مزدلفة"
+  return "غرفة وطنية"
+}
+
+/* ===========================
+   COMPONENT
+=========================== */
+
+const MEMORY_KEY = "sector_memory_v1"
+
+export default function Sectors() {
+
+  const [data, setData] = useState([])
+  const [events, setEvents] = useState([])
+  const memRef = useRef({})
+
+  useEffect(() => {
+    const m = localStorage.getItem(MEMORY_KEY)
+    memRef.current = m ? JSON.parse(m) : {}
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/pilgrims", { cache: "no-store" })
+      .then(r => r.json())
+      .then(rows => setData(Array.isArray(rows) ? rows : []))
+      .catch(() => setData([]))
+  }, [])
+
+  const sectors = useMemo(() => {
+
+    const map = new Map()
+
+    for (const p of data) {
+      const sector = String(p.clinic_location ?? p.location ?? "غير محدد")
+      const risk = normalizeRiskArabic(p.risk_level ?? p.risk)
+
+      const hr = sanitizeHR(p.heartRate)
+      const temp = sanitizeTemp(p.temperature)
+      const hyd = sanitizeHyd(p.hydrationRisk)
+
+      const e = map.get(sector) ?? {
+        sector,
+        total: 0,
+        critical: 0,
+        medium: 0,
+        low: 0,
+        hrs: [],
+        temps: [],
+        hyds: []
+      }
+
+      e.total++
+      e[risk]++
+      if (hr != null) e.hrs.push(hr)
+      if (temp != null) e.temps.push(temp)
+      if (hyd != null) e.hyds.push(hyd)
+
+      map.set(sector, e)
     }
-    const arr=Array.from(map.values()).map(x=>{
-      const score=idx(x.total,x.critical,x.medium)
-      const b=band(score)
-      const needEMS = x.critical>=2 ? 2 : x.critical===1 ? 1 : 0
-      const needCooling = (x.critical+x.medium)>=4 ? 2 : (x.critical+x.medium)>=2 ? 1 : 0
-      return {...x, score, b, needEMS, needCooling}
-    }).sort((a,b)=>a.score-b.score)
-    return arr
-  },[data])
 
-  const current = pick ? sectors.find(s=>s.sector===pick) ?? sectors[0] : sectors[0]
-  const sectorResources = useMemo(()=>{
-    if(!current) return []
-    return resources.filter(r=>String(r.sector)===String(current.sector))
-  },[resources,current])
+    const arr = []
+
+    for (const s of map.values()) {
+
+      const readiness = readinessIndex(s.total, s.critical, s.medium)
+      const hrP90 = percentile(s.hrs, 90)
+      const tempP90 = percentile(s.temps, 90)
+      const hydP90 = percentile(s.hyds, 90)
+
+      const prev = memRef.current[s.sector]?.readiness ?? readiness
+      const trend = readiness - prev
+
+      memRef.current[s.sector] = {
+        readiness,
+        lastUpdate: new Date().toISOString()
+      }
+
+      arr.push({
+        sector: s.sector,
+        cluster: getCluster(s.sector),
+        readiness,
+        trend,
+        hrP90,
+        tempP90,
+        hydP90,
+        critical: s.critical,
+        medium: s.medium,
+        total: s.total,
+        band: band(readiness)
+      })
+    }
+
+    localStorage.setItem(MEMORY_KEY, JSON.stringify(memRef.current))
+
+    arr.sort((a,b)=>a.readiness-b.readiness)
+    return arr
+
+  }, [data])
+
+  const worst = sectors[0]
+
+  function predict(sector) {
+    if (!sector) return null
+    let risk = 0
+    if ((sector.tempP90 ?? 0) > 38) risk += 2
+    if ((sector.hrP90 ?? 0) > 115) risk += 2
+    if (sector.critical > 0) risk += 2
+    return risk
+  }
+
+  function applyIntervention(sector, type) {
+
+    const impact = type === "cool" ? 8 :
+                   type === "move" ? 6 :
+                   type === "notify" ? 4 : 0
+
+    alert(`تم تسجيل تدخل: ${type} في ${sector.sector} (تحسن متوقع +${impact})`)
+
+  }
 
   return (
     <main>
-      <div className="sectionTitle">القطاعات — الجاهزية واحتياج الموارد</div>
 
-      <div className="grid2">
-        <div className="card">
-          <div className="split">
-            <div style={{fontWeight:900}}>قائمة القطاعات</div>
-            <span className="badge">الأقل جاهزية أولاً</span>
+      <div className="sectionTitle">غرفة عمليات القطاعات</div>
+
+      {worst && (
+        <div className="card" style={{marginBottom:20}}>
+          <div style={{fontWeight:900}}>
+            ⚠️ أكثر قطاع يحتاج تدخل الآن: {worst.sector}
           </div>
-
-          <div style={{display:"grid",gap:10,marginTop:12}}>
-            {sectors.map((s,i)=>(
-              <button key={i} className="tile" style={{textAlign:"right",cursor:"pointer",color:"white"}}
-                onClick={()=>setPick(s.sector)}>
-                <div className="split">
-                  <b>{s.sector}</b>
-                  <b className={s.b.cls}>{s.score}%</b>
-                </div>
-                <div style={{opacity:.85,fontSize:12,marginTop:8,lineHeight:1.8}}>
-                  حرج <b className="red">{s.critical}</b> — متوسط <b className="amber">{s.medium}</b> — إجمالي {s.total}
-                  <br/>
-                  احتياج: إسعاف <b>{s.needEMS}</b> — تبريد <b>{s.needCooling}</b>
-                </div>
-              </button>
-            ))}
-            {sectors.length===0 && <div style={{opacity:.7}}>لا توجد بيانات.</div>}
+          <div style={{opacity:.8, marginTop:6}}>
+            تابع لـ {worst.cluster} — جاهزية {worst.readiness}%
+            {worst.trend < 0 && ` — اتجاه هابط ${worst.trend}`}
           </div>
         </div>
+      )}
 
-        <div className="card">
-          <div className="split">
-            <div style={{fontWeight:900}}>تفاصيل القطاع</div>
-            {current && <span className={"badge "+current.b.cls}>{current.b.t}</span>}
-          </div>
+      <div style={{display:"grid", gap:16}}>
 
-          {!current && <div style={{opacity:.7,marginTop:12}}>اختر قطاعاً.</div>}
+        {sectors.map((s,i)=>{
 
-          {current && (
-            <>
-              <div className="grid3" style={{marginTop:12}}>
-                <div className="card"><div className="kpiLabel">جاهزية</div><div className={"kpiValue "+current.b.cls}>{current.score}%</div></div>
-                <div className="card"><div className="kpiLabel">حرجة</div><div className="kpiValue red">{current.critical}</div></div>
-                <div className="card"><div className="kpiLabel">متوسطة</div><div className="kpiValue amber">{current.medium}</div></div>
-              </div>
+          const riskScore = predict(s)
 
-              <div className="sectionTitle">احتياج الموارد (Auto)</div>
-              <div className="grid3">
-                <div className="tile split"><span style={{opacity:.8}}>فرق إسعاف مطلوبة</span><b>{current.needEMS}</b></div>
-                <div className="tile split"><span style={{opacity:.8}}>نقاط تبريد مطلوبة</span><b>{current.needCooling}</b></div>
-                <div className="tile split"><span style={{opacity:.8}}>موارد موجودة</span><b>{sectorResources.length}</b></div>
-              </div>
+          return (
+            <div key={i} className="card">
 
-              <div className="sectionTitle">الموارد في القطاع</div>
-              <div className="card" style={{padding:0}}>
-                <table className="table">
-                  <thead><tr><th>المعرف</th><th>النوع</th><th>الحالة</th></tr></thead>
-                  <tbody>
-                    {sectorResources.map((r,i)=>(
-                      <tr key={i}><td><b>{r.id}</b></td><td>{r.type}</td><td>{r.status}</td></tr>
-                    ))}
-                    {sectorResources.length===0 && <tr><td colSpan={3} style={{opacity:.7,padding:14}}>لا توجد موارد مسجلة لهذا القطاع.</td></tr>}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="sectionTitle">عينات حالات</div>
-              <div style={{display:"grid",gap:10}}>
-                {current.sample.map((p,i)=>(
-                  <div key={i} className="tile">
-                    <div className="split">
-                      <b>{p.id ?? "—"}</b>
-                      <b className={norm(p.risk_level??p.risk)==="critical"?"red":norm(p.risk_level??p.risk)==="medium"?"amber":"green"}>
-                        {p.risk_level ?? "—"}
-                      </b>
-                    </div>
-                    <div style={{opacity:.8,fontSize:13,marginTop:6}}>{p.health_status ?? "—"} — عمر {p.age ?? "—"}</div>
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <div>
+                  <div style={{fontWeight:900,fontSize:18}}>
+                    {s.sector}
                   </div>
-                ))}
+                  <div style={{opacity:.6,fontSize:12}}>
+                    {s.cluster}
+                  </div>
+                </div>
+
+                <div className={s.band.cls} style={{fontWeight:900}}>
+                  {s.readiness}%
+                </div>
               </div>
-            </>
-          )}
-        </div>
+
+              <div style={{marginTop:10, fontSize:13, opacity:.8}}>
+                حرجة {s.critical} — متوسطة {s.medium} — إجمالي {s.total}
+              </div>
+
+              <div style={{marginTop:8, fontSize:13}}>
+                HR90: {s.hrP90 ?? "—"} | Temp90: {s.tempP90 ?? "—"} | Hyd90: {s.hydP90 ?? "—"}
+              </div>
+
+              <div style={{marginTop:8}}>
+                {riskScore >= 4 &&
+                  <span className="red">توقع تصاعد خلال 20 دقيقة</span>}
+                {riskScore >= 2 && riskScore < 4 &&
+                  <span className="amber">مراقبة متقدمة</span>}
+                {riskScore < 2 &&
+                  <span className="green">مستقر حالياً</span>}
+              </div>
+
+              <div style={{display:"flex", gap:8, marginTop:12}}>
+                <button className="btn" onClick={()=>applyIntervention(s,"cool")}>
+                  تعزيز تبريد
+                </button>
+                <button className="btn" onClick={()=>applyIntervention(s,"move")}>
+                  نقل فريق
+                </button>
+                <button className="btn" onClick={()=>applyIntervention(s,"notify")}>
+                  تنبيه حملات
+                </button>
+              </div>
+
+            </div>
+          )
+        })}
+
       </div>
+
     </main>
   )
 }
