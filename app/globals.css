@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a0a0c;
+  --glass: rgba(255, 255, 255, 0.06);
+  --glass-strong: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.14);
+  --accent: #4db7ff;
+  --accent-soft: rgba(77, 183, 255, 0.15);
+}
+
+body {
+  direction: rtl;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+    "SF Pro Text", system-ui, sans-serif;
+  background: radial-gradient(circle at top, #1a1a1d 0%, #0a0a0c 70%);
+  color: #f1f5f9;
+  min-height: 100vh;
+  padding-bottom: 4rem;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+}
