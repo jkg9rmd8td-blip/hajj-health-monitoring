@@ -39,6 +39,9 @@ export default function RootLayout({ children }) {
               <Link className="navlink" href="/pilgrims">الحجاج</Link>
               <Link className="navlink" href="/executive">التنفيذي</Link>
               <Link className="navlink" href="/system">النظام</Link>
+              <Link className="navlink" href="/campaigns">الحملات</Link>
+<Link className="navlink" href="/operations">التشغيل</Link>
+<Link className="navlink" href="/audit">التدقيق</Link>
             </nav>
           </div>
 
