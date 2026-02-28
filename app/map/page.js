@@ -32,29 +32,34 @@ export default function MapPage() {
 
       const e = map.get(sector) ?? {
         sector,
-        total: 0,
         critical: 0,
-        medium: 0,
-        low: 0
+        medium: 0
       }
 
-      e.total++
-      e[risk]++
+      if (risk === "critical") e.critical++
+      if (risk === "medium") e.medium++
+
       map.set(sector, e)
     }
 
     return Array.from(map.values())
       .map(s => ({
         ...s,
-        heatScore: s.critical * 3 + s.medium * 1.5
+        heatScore: (s.critical * 3) + (s.medium * 1.5)
       }))
       .sort((a, b) => b.heatScore - a.heatScore)
 
   }, [data])
 
+  const nationalHeat = heatMap.reduce((acc, s) => acc + s.heatScore, 0)
+
   return (
     <main>
-      <div className="sectionTitle">الخريطة الحرارية التشغيلية</div>
+      <div className="sectionTitle">الخريطة الحرارية الوطنية</div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        🔥 مؤشر الضغط الوطني: {nationalHeat.toFixed(1)}
+      </div>
 
       <div style={{ display: "grid", gap: 16 }}>
         {heatMap.map((s, i) => (
