@@ -23,12 +23,9 @@ function band(score) {
   return { label: "تأهب", cls: "red" }
 }
 
-function fmtTime(d) {
-  try { return d.toLocaleTimeString("ar-SA") } catch { return "—" }
-}
-
 export default function Home() {
   const [data, setData] = useState([])
+  const [events, setEvents] = useState([])
   const [lastSync, setLastSync] = useState(null)
 
   const load = () => {
@@ -38,33 +35,33 @@ export default function Home() {
         setData(Array.isArray(rows) ? rows : [])
         setLastSync(new Date())
       })
-      .catch(() => {
-        setData([])
-        setLastSync(new Date())
-      })
+      .catch(() => setData([]))
+
+    fetch("/api/events", { cache: "no-store" })
+      .then(r => r.json())
+      .then(rows => setEvents(Array.isArray(rows) ? rows : []))
+      .catch(() => setEvents([]))
   }
 
   useEffect(() => {
     load()
-    const t = setInterval(load, 10000) // تحديث 10 ثواني
+    const t = setInterval(load, 10000)
     return () => clearInterval(t)
   }, [])
 
-  const stats = useMemo(() => {
+  const national = useMemo(() => {
     const total = data.length
     const critical = data.filter(p => normalizeRiskArabic(p.risk_level ?? p.risk) === "critical").length
     const medium = data.filter(p => normalizeRiskArabic(p.risk_level ?? p.risk) === "medium").length
-    const low = data.filter(p => normalizeRiskArabic(p.risk_level ?? p.risk) === "low").length
+    const low = total - critical - medium
+    const score = readinessIndex(total, critical, medium)
+    const b = band(score)
 
-    const readiness = readinessIndex(total, critical, medium)
-    const b = band(readiness)
-
-    // إشارات سوار (إذا موجودة)
     const highTemp = data.filter(p => Number(p.temperature) >= 38.5).length
     const highPulse = data.filter(p => Number(p.heartRate) >= 120).length
     const highHyd = data.filter(p => Number(p.hydrationRisk) >= 60).length
 
-    return { total, critical, medium, low, readiness, band: b, highTemp, highPulse, highHyd }
+    return { total, critical, medium, low, score, b, highTemp, highPulse, highHyd }
   }, [data])
 
   const hotspots = useMemo(() => {
@@ -73,175 +70,136 @@ export default function Home() {
       const sector = String(p.clinic_location ?? p.location ?? "غير محدد")
       const risk = normalizeRiskArabic(p.risk_level ?? p.risk)
       const e = map.get(sector) ?? { sector, total: 0, critical: 0, medium: 0, low: 0 }
-      e.total++
-      e[risk]++
+      e.total++; e[risk]++
       map.set(sector, e)
     }
     const arr = Array.from(map.values()).map(s => ({
       ...s,
-      readiness: readinessIndex(s.total, s.critical, s.medium)
+      readiness: readinessIndex(s.total, s.critical, s.medium),
+      band: band(readinessIndex(s.total, s.critical, s.medium))
     }))
     return arr.sort((a, b) => (a.readiness - b.readiness) || (b.critical - a.critical)).slice(0, 6)
   }, [data])
 
-  const criticalRows = useMemo(() => {
-    return data
-      .filter(p => normalizeRiskArabic(p.risk_level ?? p.risk) === "critical")
-      .slice(0, 8)
-  }, [data])
+  const topAlerts = useMemo(() => {
+    const raised = events.filter(e => e.type === "ALERT_RAISED").slice(-10).reverse()
+    return raised
+  }, [events])
 
   const actions = useMemo(() => {
     const items = []
-    if (stats.band.label === "تأهب") {
-      items.push({ title: "رفع التأهب", detail: "تعزيز فرق الإسعاف والفرز في القطاعات الأقل جاهزية خلال الذروة." })
-      items.push({ title: "إجراءات بيئية", detail: "تكثيف التبريد/الرش في البؤر الساخنة وفق الخريطة التشغيلية." })
-      items.push({ title: "تنبيه الحملات", detail: "تفعيل رسائل وقائية إلزامية للمجموعات عالية الخطورة." })
-    } else if (stats.band.label === "مراقبة") {
-      items.push({ title: "مراقبة معززة", detail: "رفع نقاط الفرز وتهيئة فرق متنقلة احتياطية." })
-      items.push({ title: "وقاية استباقية", detail: "توجيه الحملات لإدارة الإجهاد (راحة/سوائل/تقليل جهد)." })
+    if (national.b.label === "تأهب") {
+      items.push({ t: "رفع التأهب", d: "تعزيز فرق الإسعاف والفرز في القطاعات الأقل جاهزية خلال الذروة." })
+      items.push({ t: "إجراءات بيئية", d: "تكثيف التبريد/الرش في البؤر الساخنة وفق الخريطة التشغيلية." })
+      items.push({ t: "تنبيه الحملات", d: "إجراءات وقائية إلزامية للمجموعات عالية الخطورة داخل الحملات." })
+    } else if (national.b.label === "مراقبة") {
+      items.push({ t: "مراقبة معززة", d: "رفع نقاط الفرز وتهيئة فرق متنقلة احتياطية." })
+      items.push({ t: "وقاية استباقية", d: "توجيه الحملات لإدارة الإجهاد (راحة/سوائل/تقليل جهد)." })
     } else {
-      items.push({ title: "استقرار تشغيلي", detail: "استمرار الرصد وتحسين التوزيع حسب الاتجاهات." })
+      items.push({ t: "استقرار تشغيلي", d: "استمرار الرصد وتحسين التوزيع حسب الاتجاهات." })
     }
     return items
-  }, [stats])
+  }, [national])
 
   return (
     <main>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginTop: 10 }}>
-        <div className="sectionTitle" style={{ margin: 0 }}>غرفة العمليات الوطنية — صحة ضيوف الرحمن</div>
-        <div style={{ opacity: .65, fontSize: 13 }}>آخر تحديث: {lastSync ? fmtTime(lastSync) : "—"}</div>
+      <div className="split" style={{ marginTop: 10 }}>
+        <div>
+          <div className="sectionTitle" style={{ margin: 0 }}>غرفة العمليات الوطنية</div>
+          <div style={{ opacity: .75, fontSize: 13, lineHeight: 1.8 }}>
+            لوحة قيادة سيادية لرصد المخاطر والتوجيه الاستباقي لضيوف الرحمن.
+          </div>
+        </div>
+        <span className="badge">
+          آخر تحديث: {lastSync ? lastSync.toLocaleTimeString("ar-SA") : "—"}
+        </span>
       </div>
 
       <div className="grid4" style={{ marginTop: 14 }}>
-        <KPI label="إجمالي الحالات تحت الرصد" value={stats.total} />
-        <KPI label="حالات حرجة" value={stats.critical} tone="red" />
-        <KPI label="حالات متوسطة" value={stats.medium} tone="amber" />
-        <KPI label="حالات منخفضة" value={stats.low} tone="green" />
+        <div className="card">
+          <div className="kpiLabel">جاهزية وطنية</div>
+          <div className={"kpiValue " + national.b.cls}>{national.score}%</div>
+        </div>
+        <div className="card">
+          <div className="kpiLabel">حالات حرجة</div>
+          <div className="kpiValue red">{national.critical}</div>
+        </div>
+        <div className="card">
+          <div className="kpiLabel">حالات متوسطة</div>
+          <div className="kpiValue amber">{national.medium}</div>
+        </div>
+        <div className="card">
+          <div className="kpiLabel">تحت الرصد</div>
+          <div className="kpiValue">{national.total}</div>
+        </div>
       </div>
 
-      <div className="grid2" style={{ marginTop: 14 }}>
+      <div className="grid3" style={{ marginTop: 12 }}>
         <div className="card">
-          <div className="kpiLabel">المؤشر الوطني للجاهزية الصحية</div>
-          <div className={"kpiValue " + stats.band.cls}>{stats.readiness}%</div>
-          <div style={{ marginTop: 10, opacity: .8, fontSize: 13 }}>
-            الحالة: <b>{stats.band.label}</b> — يعتمد على توزيع (حرج/متوسط) لكل الحالات.
+          <div className="kpiLabel">إشارات حيوية (إن وجدت)</div>
+          <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+            <div className="tile split"><span style={{ opacity:.8 }}>حرارة ≥ 38.5</span><b className="amber">{national.highTemp}</b></div>
+            <div className="tile split"><span style={{ opacity:.8 }}>نبض ≥ 120</span><b className="red">{national.highPulse}</b></div>
+            <div className="tile split"><span style={{ opacity:.8 }}>مخاطر جفاف ≥ 60</span><b className="amber">{national.highHyd}</b></div>
           </div>
-
-          <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <MiniChip label="حرارة مرتفعة" value={stats.highTemp} tone="amber" />
-            <MiniChip label="نبض مرتفع" value={stats.highPulse} tone="red" />
-            <MiniChip label="مخاطر جفاف" value={stats.highHyd} tone="amber" />
-          </div>
-          <div style={{ marginTop: 10, opacity: .65, fontSize: 12 }}>
-            * المؤشرات الحيوية تظهر فقط إذا كانت موجودة في البيانات.
+          <div style={{ opacity:.65, fontSize: 12, marginTop: 10 }}>
+            * تظهر القيم إذا كانت موجودة في بيانات السوار.
           </div>
         </div>
 
         <div className="card">
-          <div className="kpiLabel">بطاقات قرار (Executive Actions)</div>
-          <div style={{ display: "grid", gap: 10 }}>
+          <div className="kpiLabel">قرارات تنفيذية فورية</div>
+          <div style={{ display:"grid", gap: 10, marginTop: 10 }}>
             {actions.map((a, i) => (
-              <div key={i} style={{
-                background: "rgba(255,255,255,.05)",
-                border: "1px solid rgba(255,255,255,.10)",
-                borderRadius: 14,
-                padding: 14
-              }}>
-                <div style={{ fontWeight: 900, marginBottom: 6 }}>{a.title}</div>
-                <div style={{ opacity: .8, fontSize: 13, lineHeight: 1.8 }}>{a.detail}</div>
+              <div className="tile" key={i}>
+                <div style={{ fontWeight: 900 }}>{a.t}</div>
+                <div style={{ opacity:.8, fontSize: 13, lineHeight: 1.8, marginTop: 6 }}>{a.d}</div>
               </div>
             ))}
           </div>
         </div>
-      </div>
 
-      <div className="sectionTitle">البؤر الساخنة (Hotspots) حسب القطاعات</div>
-      <div className="card" style={{ padding: 0 }}>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>القطاع</th>
-              <th>الجاهزية</th>
-              <th>إجمالي</th>
-              <th>حرج</th>
-              <th>متوسط</th>
-            </tr>
-          </thead>
-          <tbody>
-            {hotspots.map((h, i) => {
-              const b = band(h.readiness)
-              return (
-                <tr key={i}>
-                  <td style={{ fontWeight: 900 }}>{h.sector}</td>
-                  <td className={b.cls} style={{ fontWeight: 900 }}>{h.readiness}%</td>
-                  <td>{h.total}</td>
-                  <td className="red" style={{ fontWeight: 900 }}>{h.critical}</td>
-                  <td className="amber" style={{ fontWeight: 900 }}>{h.medium}</td>
-                </tr>
-              )
-            })}
-            {hotspots.length === 0 && (
-              <tr><td colSpan={5} style={{ textAlign: "center", opacity: .6, padding: 18 }}>لا توجد بيانات.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="sectionTitle">الحالات الحرجة — عرض سريع</div>
-      <div className="card" style={{ padding: 0 }}>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>المعرّف</th>
-              <th>العمر</th>
-              <th>الحالة</th>
-              <th>القطاع</th>
-              <th>المستوى</th>
-            </tr>
-          </thead>
-          <tbody>
-            {criticalRows.map((p, i) => (
-              <tr key={i}>
-                <td>{p.id ?? "—"}</td>
-                <td>{p.age ?? "—"}</td>
-                <td>{p.health_status ?? "—"}</td>
-                <td>{p.clinic_location ?? "—"}</td>
-                <td className="red" style={{ fontWeight: 900 }}>{p.risk_level ?? "حرجة"}</td>
-              </tr>
+        <div className="card">
+          <div className="kpiLabel">آخر التنبيهات (Raised)</div>
+          <div style={{ display:"grid", gap: 10, marginTop: 10 }}>
+            {topAlerts.map((e, i) => (
+              <div className="tile" key={i}>
+                <div className="split">
+                  <b>{e.sector ?? "—"}</b>
+                  <span className={String(e.severity).includes("CRIT") ? "red" : "amber"} style={{ fontWeight: 900 }}>
+                    {String(e.severity).includes("CRIT") ? "حرج" : "وقائي"}
+                  </span>
+                </div>
+                <div style={{ opacity:.8, fontSize: 13, marginTop: 6 }}>
+                  {e.pilgrim_id ?? "—"} — {e.campaign_id ?? "—"}
+                </div>
+                <div style={{ opacity:.6, fontSize: 12, marginTop: 6 }}>{e.reason ?? ""}</div>
+              </div>
             ))}
-            {criticalRows.length === 0 && (
-              <tr><td colSpan={5} style={{ textAlign: "center", opacity: .6, padding: 18 }}>لا توجد حالات حرجة حالياً.</td></tr>
+            {topAlerts.length === 0 && (
+              <div style={{ opacity:.7, fontSize: 13 }}>لا توجد أحداث بعد (أضف events.json).</div>
             )}
-          </tbody>
-        </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="sectionTitle">البؤر الساخنة (Hotspots)</div>
+      <div className="grid3">
+        {hotspots.map((h, i) => (
+          <div className="tile" key={i}>
+            <div className="split">
+              <b>{h.sector}</b>
+              <b className={h.band.cls}>{h.readiness}%</b>
+            </div>
+            <div style={{ opacity:.8, fontSize: 13, marginTop: 8 }}>
+              إجمالي {h.total} — حرج <b className="red">{h.critical}</b> — متوسط <b className="amber">{h.medium}</b>
+            </div>
+          </div>
+        ))}
+        {hotspots.length === 0 && (
+          <div className="tile" style={{ opacity:.7 }}>لا توجد بيانات قطاعات.</div>
+        )}
       </div>
     </main>
-  )
-}
-
-function KPI({ label, value, tone }) {
-  return (
-    <div className="card">
-      <div className="kpiLabel">{label}</div>
-      <div className={"kpiValue " + (tone || "")}>{value}</div>
-    </div>
-  )
-}
-
-function MiniChip({ label, value, tone }) {
-  const cls = tone === "red" ? "red" : tone === "amber" ? "amber" : "green"
-  return (
-    <div style={{
-      background: "rgba(255,255,255,.05)",
-      border: "1px solid rgba(255,255,255,.10)",
-      borderRadius: 999,
-      padding: "10px 12px",
-      display: "flex",
-      alignItems: "center",
-      gap: 10
-    }}>
-      <span style={{ opacity: .75, fontSize: 12 }}>{label}</span>
-      <span className={cls} style={{ fontWeight: 900 }}>{value}</span>
-    </div>
   )
 }
