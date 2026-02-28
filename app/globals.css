@@ -25,7 +25,7 @@ a{ color:inherit; text-decoration:none; }
   background: var(--sa-green);
   padding: 10px 22px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .topbarRow{
@@ -48,6 +48,7 @@ a{ color:inherit; text-decoration:none; }
   align-items:center;
   justify-content:space-between;
   gap:16px;
+  flex-wrap: wrap;
 }
 
 .brand{
@@ -57,14 +58,14 @@ a{ color:inherit; text-decoration:none; }
 }
 
 .brandTitle{
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 900;
   letter-spacing: -0.02em;
 }
 
 .brandSub{
   font-size: 13px;
-  opacity:.7;
+  opacity:.75;
 }
 
 .navlinks{
@@ -115,7 +116,8 @@ a{ color:inherit; text-decoration:none; }
 }
 
 .kpiLabel{ font-size: 13px; opacity:.65; margin-bottom:10px; }
-.kpiValue{ font-size: 34px; font-weight: 800; letter-spacing:-.02em; }
+.kpiValue{ font-size: 34px; font-weight: 900; letter-spacing:-.02em; }
+
 .red{ color:#ef4444; }
 .amber{ color:#f59e0b; }
 .green{ color:#22c55e; }
@@ -123,8 +125,8 @@ a{ color:inherit; text-decoration:none; }
 .sectionTitle{
   margin: 24px 0 12px;
   font-size: 18px;
-  font-weight: 800;
-  opacity:.9;
+  font-weight: 900;
+  opacity:.95;
 }
 
 .table{
