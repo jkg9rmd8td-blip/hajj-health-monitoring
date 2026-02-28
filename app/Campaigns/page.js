@@ -55,7 +55,7 @@ export default function Campaigns() {
     const map = new Map()
 
     for (const p of data) {
-      const loc = String(p.clinic_location ?? "غير محدد")
+      const loc = String(p.campaign_id ?? p.clinic_location ?? "غير محدد")
       const risk = normalizeRiskArabic(p.risk_level)
       const entry = map.get(loc) ?? { campaign: loc, total: 0, critical: 0, medium: 0, low: 0, sample: [] }
       entry.total += 1
