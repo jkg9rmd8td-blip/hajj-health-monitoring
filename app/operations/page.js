@@ -1,102 +1,107 @@
 "use client"
-
 import { useEffect, useMemo, useState } from "react"
 
-function normalizeRiskArabic(v) {
-  const x = String(v ?? "").trim()
-  if (x.includes("حرج")) return "critical"
-  if (x.includes("متوسط")) return "medium"
-  return "low"
-}
+function norm(v){ const x=String(v??"").trim(); if(x.includes("حرج"))return"critical"; if(x.includes("متوسط"))return"medium"; return"low"; }
+function idx(t,c,m){ if(!t)return 100; let s=100-Math.round((c/t)*100*1.25)-Math.round((m/t)*100*0.55); return Math.max(0,Math.min(100,s)); }
 
-function buildActionsBySector(sector, stats) {
-  const actions = []
+export default function Operations(){
+  const [data,setData]=useState([])
+  const [rules,setRules]=useState({
+    readinessRed: 70,
+    tempHigh: 38.5,
+    hydrationHigh: 60,
+    pulseHigh: 120
+  })
 
-  if (stats.critical >= 2) {
-    actions.push("رفع مستوى الاستجابة (أحمر): توجيه فريق إسعافي ميداني إلى القطاع فورًا.")
-    actions.push("تفعيل مسار نقل سريع للحالات الحرجة (الساعة الذهبية).")
-  } else if (stats.medium >= 3) {
-    actions.push("رفع مستوى المتابعة (أصفر): تعزيز نقاط الفرز وتوجيه فريق وقائي.")
-  }
+  useEffect(()=>{
+    fetch("/api/pilgrims",{cache:"no-store"}).then(r=>r.json()).then(x=>setData(Array.isArray(x)?x:[])).catch(()=>setData([]))
+  },[])
 
-  if (String(sector).includes("منى")) {
-    actions.push("إجراء تشغيلي: تعزيز نقاط التبريد/الرش في محيط القطاع.")
-  }
+  const metrics = useMemo(()=>{
+    const t=data.length
+    const c=data.filter(p=>norm(p.risk_level??p.risk)==="critical").length
+    const m=data.filter(p=>norm(p.risk_level??p.risk)==="medium").length
+    const readiness=idx(t,c,m)
+    const highTemp=data.filter(p=>Number(p.temperature)>=rules.tempHigh).length
+    const highHyd=data.filter(p=>Number(p.hydrationRisk)>=rules.hydrationHigh).length
+    const highPulse=data.filter(p=>Number(p.heartRate)>=rules.pulseHigh).length
+    return {t,c,m,readiness,highTemp,highHyd,highPulse}
+  },[data,rules])
 
-  if (stats.total >= 5 && stats.critical === 0 && stats.medium >= 3) {
-    actions.push("إجراء وقائي: إرسال رسائل توعوية للحملات داخل القطاع (سوائل/راحة/تقليل إجهاد).")
-  }
-
-  if (actions.length === 0) {
-    actions.push("لا إجراءات تصعيد حالياً. الاستمرار في الرصد.")
-  }
-
-  return actions
-}
-
-export default function Operations() {
-  const [data, setData] = useState([])
-
-  useEffect(() => {
-    fetch("/api/pilgrims", { cache: "no-store" })
-      .then(r => r.json())
-      .then(setData)
-      .catch(() => setData([]))
-  }, [])
-
-  const sectors = useMemo(() => {
-    const map = new Map()
-
-    for (const p of data) {
-      const sector = String(p.clinic_location ?? "غير محدد")
-      const risk = normalizeRiskArabic(p.risk_level)
-      const e = map.get(sector) ?? { sector, total: 0, critical: 0, medium: 0, low: 0 }
-      e.total += 1
-      e[risk] += 1
-      map.set(sector, e)
+  const decisions = useMemo(()=>{
+    const d=[]
+    if(metrics.readiness < rules.readinessRed){
+      d.push({level:"أحمر", title:"رفع التأهب", why:`الجاهزية ${metrics.readiness}% أقل من ${rules.readinessRed}%`, action:"تعزيز الإسعاف/الفرز + إعادة توزيع الموارد + تنبيه الحملات"})
+    }else{
+      d.push({level:"مراقبة", title:"استمرار الرصد", why:`الجاهزية ${metrics.readiness}%`, action:"متابعة بؤر القطاعات وتحديث الخطة كل 30 دقيقة"})
     }
 
-    const arr = Array.from(map.values()).map(s => ({
-      ...s,
-      actions: buildActionsBySector(s.sector, s)
-    }))
-
-    return arr.sort((a, b) => (b.critical - a.critical) || (b.medium - a.medium) || (b.total - a.total))
-  }, [data])
+    if(metrics.highTemp>0){
+      d.push({level:"بيئي", title:"تفعيل تدخلات تبريد", why:`رصد حرارة مرتفعة لدى ${metrics.highTemp} حالة`, action:"رفع التبريد/الرش + توجيه تقليل جهد للمشاة"})
+    }
+    if(metrics.highHyd>0){
+      d.push({level:"وقائي", title:"حملة سوائل استباقية", why:`مخاطر جفاف لدى ${metrics.highHyd} حالة`, action:"رسائل للحملات + نقاط توزيع مياه + راحة"})
+    }
+    if(metrics.highPulse>0){
+      d.push({level:"طبي", title:"فرز قلبي سريع", why:`نبض مرتفع لدى ${metrics.highPulse} حالة`, action:"رفع حساسية الفرز القلبي في النقاط الطبية"})
+    }
+    return d
+  },[metrics,rules])
 
   return (
     <main>
-      <div className="sectionTitle">محرك القرار التشغيلي (Policy Engine)</div>
+      <div className="sectionTitle">التشغيل — محرك القرار (Policy Engine)</div>
 
-      <div className="card" style={{ opacity: .8, fontSize: 13, lineHeight: 1.9 }}>
-        يحوّل هذا المحرك مستويات الخطورة إلى <b>إجراءات تنفيذية</b> حسب القطاع.
-        في المرحلة القادمة سيتم تغذيته بمؤشرات السوار (نبض/حرارة/نشاط) لرفع دقة التوصيات.
-      </div>
-
-      <div className="sectionTitle">إجراءات مقترحة حسب القطاعات</div>
       <div className="grid2">
-        {sectors.map((s, i) => (
-          <div className="card" key={i}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-              <div style={{ fontWeight: 900 }}>{s.sector}</div>
-              <div style={{ opacity: .75, fontSize: 12 }}>
-                إجمالي {s.total} — <span className="red" style={{ fontWeight: 900 }}>حرج {s.critical}</span> — <span className="amber" style={{ fontWeight: 900 }}>متوسط {s.medium}</span>
+        <div className="card">
+          <div style={{fontWeight:900}}>قواعد التشغيل (MVP)</div>
+          <div style={{opacity:.75,fontSize:13,lineHeight:1.9,marginTop:8}}>يمكن تعديل العتبات لتغيير قرارات النظام دون كود.</div>
+
+          <div style={{display:"grid",gap:10,marginTop:12}}>
+            {[
+              ["جاهزية أحمر أقل من", "readinessRed"],
+              ["حرارة مرتفعة ≥", "tempHigh"],
+              ["مخاطر جفاف ≥", "hydrationHigh"],
+              ["نبض مرتفع ≥", "pulseHigh"]
+            ].map(([label,key])=>(
+              <div key={key} className="tile split">
+                <span style={{opacity:.85}}>{label}</span>
+                <input className="input" style={{maxWidth:140,textAlign:"center"}} value={rules[key]}
+                  onChange={(e)=>setRules({...rules,[key]: Number(e.target.value)})}/>
               </div>
-            </div>
-
-            <ul style={{ margin: "10px 0 0", paddingRight: 18, opacity: .9, lineHeight: 1.9, fontSize: 13 }}>
-              {s.actions.map((a, idx) => (
-                <li key={idx}>{a}</li>
-              ))}
-            </ul>
+            ))}
           </div>
-        ))}
+        </div>
 
-        {sectors.length === 0 && (
-          <div className="card" style={{ opacity: .6 }}>
-            لا توجد بيانات.
+        <div className="card">
+          <div style={{fontWeight:900}}>قرارات النظام (Auto)</div>
+          <div style={{display:"grid",gap:10,marginTop:12}}>
+            {decisions.map((x,i)=>(
+              <div key={i} className="tile">
+                <div className="split">
+                  <b>{x.title}</b>
+                  <span className="badge">{x.level}</span>
+                </div>
+                <div style={{opacity:.8,fontSize:13,lineHeight:1.8,marginTop:8}}>
+                  <b>السبب:</b> {x.why}<br/>
+                  <b>الإجراء:</b> {x.action}
+                </div>
+              </div>
+            ))}
           </div>
-        )}
+
+          <button className="btn" style={{marginTop:12}} onClick={()=>{
+            const text = `قرارات تشغيلية — محرك القرار
+جاهزية: ${metrics.readiness}%
+حرارة مرتفعة: ${metrics.highTemp}
+مخاطر جفاف: ${metrics.highHyd}
+نبض مرتفع: ${metrics.highPulse}
+
+القرارات:
+- ${decisions.map(d=>`${d.title} | السبب: ${d.why} | الإجراء: ${d.action}`).join("\n- ")}`
+            navigator.clipboard?.writeText(text); alert("تم نسخ التقرير ✅")
+          }}>نسخ تقرير تشغيل</button>
+        </div>
       </div>
     </main>
   )
