@@ -1,34 +1,29 @@
+import KPI from "./components/KPI"
+import dynamic from "next/dynamic"
+
+const LiveMap = dynamic(() => import("./components/LiveMap"), {
+  ssr: false
+})
+
 export default function Dashboard() {
   return (
     <div>
       <h2 className="section-title mb-6">
-        National Health Overview
+        National Health Command Overview
       </h2>
 
-      <div className="grid grid-cols-4 gap-6">
+      <div className="grid grid-cols-4 gap-6 mb-8">
+        <KPI label="Total Pilgrims" value={1845000} color="text-cyan-400" />
+        <KPI label="Active Alerts" value={32} color="text-red-400" />
+        <KPI label="Critical Cases" value={8} color="text-yellow-400" />
+        <KPI label="Medical Teams Active" value={245} color="text-green-400" />
+      </div>
 
-        <div className="card">
-          <p className="text-sm text-gray-400">Total Pilgrims</p>
-          <h3 className="text-3xl font-bold mt-2">1,845,000</h3>
-        </div>
-
-        <div className="card">
-          <p className="text-sm text-gray-400">Active Alerts</p>
-          <h3 className="text-3xl font-bold text-red-400 mt-2">32</h3>
-        </div>
-
-        <div className="card">
-          <p className="text-sm text-gray-400">Critical Cases</p>
-          <h3 className="text-3xl font-bold text-yellow-400 mt-2">8</h3>
-        </div>
-
-        <div className="card">
-          <p className="text-sm text-gray-400">System Status</p>
-          <h3 className="text-3xl font-bold text-green-400 mt-2">
-            Operational
-          </h3>
-        </div>
-
+      <div className="card">
+        <h3 className="mb-4 text-lg font-semibold text-cyan-400">
+          Live Risk Map
+        </h3>
+        <LiveMap />
       </div>
     </div>
   )
