@@ -2,14 +2,18 @@
 
 import { useEffect, useState } from "react"
 
-export default function CommandCenter() {
+export default function VisionCommand() {
 
   const [data, setData] = useState([])
+  const [count, setCount] = useState(0)
 
   useEffect(() => {
     fetch("/api/pilgrims")
       .then(res => res.json())
-      .then(setData)
+      .then(json => {
+        setData(json)
+        animateCounter(json.length)
+      })
       .catch(() => setData([]))
   }, [])
 
@@ -17,53 +21,78 @@ export default function CommandCenter() {
   const critical = data.filter(p => p.risk === "critical").length
   const stability = total ? 100 - Math.round((critical / total) * 100) : 100
 
+  function animateCounter(target) {
+    let start = 0
+    const interval = setInterval(() => {
+      start += Math.ceil(target / 20)
+      if (start >= target) {
+        start = target
+        clearInterval(interval)
+      }
+      setCount(start)
+    }, 30)
+  }
+
   return (
-    <main className="min-h-screen p-12">
+    <main className="min-h-screen p-16 relative">
+
+      {/* Ambient Glow */}
+      <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-blue-500 opacity-10 blur-[200px] rounded-full"></div>
 
       {/* Header */}
-      <div className="flex justify-between items-center mb-16">
-        <h1 className="title-hero">
-          Hajj Health Command Center
-        </h1>
+      <div className="flex justify-between items-center mb-20 relative z-10">
 
-        <div className="glass px-6 py-3 soft-shadow smooth">
-          <span className="text-sm opacity-70">System Stability</span>
-          <div className="kpi-value">{stability}%</div>
+        <div>
+          <h1 className="text-5xl font-semibold tracking-tight">
+            Hajj Vision Command
+          </h1>
+          <div className="flex items-center gap-3 mt-3 opacity-60">
+            <div className="status-orb"></div>
+            System Online
+          </div>
         </div>
+
+        <div className="deep-glass px-8 py-6 soft-shadow glow float">
+          <div className="opacity-60 text-sm">System Stability</div>
+          <div className="kpi-number text-blue-400">{stability}%</div>
+        </div>
+
       </div>
 
       {/* KPI Grid */}
-      <div className="grid md:grid-cols-3 gap-10">
+      <div className="grid md:grid-cols-3 gap-12 relative z-10">
 
-        <GlassCard title="Total Pilgrims" value={total} />
-        <GlassCard title="Critical Cases" value={critical} highlight />
-        <GlassCard title="Active Monitoring" value={total - critical} />
+        <Card title="Total Pilgrims" value={count} />
+        <Card title="Critical Cases" value={critical} highlight />
+        <Card title="Monitored" value={total - critical} />
 
       </div>
 
-      {/* Live Section */}
-      <div className="mt-20 glass p-10 soft-shadow smooth">
-        <h2 className="text-xl mb-6 opacity-80">
-          Live Critical Feed
+      {/* Live Feed */}
+      <div className="mt-24 deep-glass p-12 soft-shadow float relative z-10">
+        <h2 className="text-2xl mb-8 opacity-70">
+          Real-Time Critical Stream
         </h2>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           {data.filter(p => p.risk === "critical").map((p, i) => (
             <div
               key={i}
-              className="flex justify-between items-center glass px-6 py-4 smooth hover:scale-[1.01]"
+              className="glass px-8 py-6 flex justify-between items-center float"
             >
-              <span>{p.name}</span>
-              <span className="opacity-60">{p.location}</span>
-              <span className="text-red-400 font-semibold">
+              <div>
+                <div className="text-lg">{p.name}</div>
+                <div className="opacity-50 text-sm">{p.location}</div>
+              </div>
+              <div className="text-red-400 text-xl font-semibold">
                 {p.heartRate} BPM
-              </span>
+              </div>
             </div>
           ))}
 
           {critical === 0 && (
-            <div className="opacity-50 text-center py-10">
-              All systems stable.
+            <div className="opacity-40 text-center py-16">
+              All systems stable. No critical cases.
             </div>
           )}
         </div>
@@ -73,11 +102,11 @@ export default function CommandCenter() {
   )
 }
 
-function GlassCard({ title, value, highlight }) {
+function Card({ title, value, highlight }) {
   return (
-    <div className={`glass p-10 soft-shadow smooth hover:scale-[1.02]`}>
-      <div className="opacity-60 mb-2">{title}</div>
-      <div className={`kpi-value ${highlight ? "text-red-400" : ""}`}>
+    <div className="glass p-12 soft-shadow float">
+      <div className="opacity-50 mb-3">{title}</div>
+      <div className={`kpi-number ${highlight ? "text-red-400" : ""}`}>
         {value}
       </div>
     </div>
