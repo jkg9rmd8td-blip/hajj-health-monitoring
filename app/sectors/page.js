@@ -2,18 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 
-/* ===========================
-   UTILITIES
-=========================== */
+/* =======================
+   أدوات مساعدة
+======================= */
 
 function clamp(n, a, b) {
   if (!isFinite(n)) return null
   return Math.max(a, Math.min(b, n))
 }
+
 function num(v) {
   const x = Number(v)
   return isFinite(x) ? x : null
 }
+
 function sanitizeHR(v) { return clamp(num(v), 35, 200) }
 function sanitizeTemp(v) { return clamp(num(v), 34, 41.5) }
 function sanitizeHyd(v) { return clamp(num(v), 0, 100) }
@@ -46,10 +48,6 @@ function percentile(arr, p) {
   return sorted[idx]
 }
 
-/* ===========================
-   MAPPING SECTOR → CLUSTER
-=========================== */
-
 function getCluster(sector) {
   if (!sector) return "غرفة وطنية"
   if (sector.includes("منى")) return "تجمع مكة"
@@ -58,23 +56,28 @@ function getCluster(sector) {
   return "غرفة وطنية"
 }
 
-/* ===========================
-   COMPONENT
-=========================== */
+/* =======================
+   الصفحة
+======================= */
 
-const MEMORY_KEY = "sector_memory_v1"
+const MEMORY_KEY = "sector_memory_v2"
 
 export default function Sectors() {
 
   const [data, setData] = useState([])
-  const [events, setEvents] = useState([])
+  const [memoryLoaded, setMemoryLoaded] = useState(false)
   const memRef = useRef({})
 
+  // قراءة localStorage بأمان
   useEffect(() => {
-    const m = localStorage.getItem(MEMORY_KEY)
-    memRef.current = m ? JSON.parse(m) : {}
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem(MEMORY_KEY)
+      memRef.current = stored ? JSON.parse(stored) : {}
+      setMemoryLoaded(true)
+    }
   }, [])
 
+  // جلب البيانات
   useEffect(() => {
     fetch("/api/pilgrims", { cache: "no-store" })
       .then(r => r.json())
@@ -114,15 +117,11 @@ export default function Sectors() {
       map.set(sector, e)
     }
 
-    const arr = []
+    const result = []
 
     for (const s of map.values()) {
 
       const readiness = readinessIndex(s.total, s.critical, s.medium)
-      const hrP90 = percentile(s.hrs, 90)
-      const tempP90 = percentile(s.temps, 90)
-      const hydP90 = percentile(s.hyds, 90)
-
       const prev = memRef.current[s.sector]?.readiness ?? readiness
       const trend = readiness - prev
 
@@ -131,14 +130,14 @@ export default function Sectors() {
         lastUpdate: new Date().toISOString()
       }
 
-      arr.push({
+      result.push({
         sector: s.sector,
         cluster: getCluster(s.sector),
         readiness,
         trend,
-        hrP90,
-        tempP90,
-        hydP90,
+        hrP90: percentile(s.hrs, 90),
+        tempP90: percentile(s.temps, 90),
+        hydP90: percentile(s.hyds, 90),
         critical: s.critical,
         medium: s.medium,
         total: s.total,
@@ -146,110 +145,54 @@ export default function Sectors() {
       })
     }
 
-    localStorage.setItem(MEMORY_KEY, JSON.stringify(memRef.current))
-
-    arr.sort((a,b)=>a.readiness-b.readiness)
-    return arr
+    return result.sort((a, b) => a.readiness - b.readiness)
 
   }, [data])
 
+  // حفظ localStorage بأمان
+  useEffect(() => {
+    if (memoryLoaded && typeof window !== "undefined") {
+      localStorage.setItem(MEMORY_KEY, JSON.stringify(memRef.current))
+    }
+  }, [sectors, memoryLoaded])
+
   const worst = sectors[0]
-
-  function predict(sector) {
-    if (!sector) return null
-    let risk = 0
-    if ((sector.tempP90 ?? 0) > 38) risk += 2
-    if ((sector.hrP90 ?? 0) > 115) risk += 2
-    if (sector.critical > 0) risk += 2
-    return risk
-  }
-
-  function applyIntervention(sector, type) {
-
-    const impact = type === "cool" ? 8 :
-                   type === "move" ? 6 :
-                   type === "notify" ? 4 : 0
-
-    alert(`تم تسجيل تدخل: ${type} في ${sector.sector} (تحسن متوقع +${impact})`)
-
-  }
 
   return (
     <main>
-
       <div className="sectionTitle">غرفة عمليات القطاعات</div>
 
       {worst && (
-        <div className="card" style={{marginBottom:20}}>
-          <div style={{fontWeight:900}}>
-            ⚠️ أكثر قطاع يحتاج تدخل الآن: {worst.sector}
-          </div>
-          <div style={{opacity:.8, marginTop:6}}>
-            تابع لـ {worst.cluster} — جاهزية {worst.readiness}%
-            {worst.trend < 0 && ` — اتجاه هابط ${worst.trend}`}
-          </div>
+        <div className="card" style={{ marginBottom: 20 }}>
+          <b>⚠️ أكثر قطاع يحتاج تدخل:</b> {worst.sector} — {worst.readiness}%
         </div>
       )}
 
-      <div style={{display:"grid", gap:16}}>
-
-        {sectors.map((s,i)=>{
-
-          const riskScore = predict(s)
-
-          return (
-            <div key={i} className="card">
-
-              <div style={{display:"flex",justifyContent:"space-between"}}>
-                <div>
-                  <div style={{fontWeight:900,fontSize:18}}>
-                    {s.sector}
-                  </div>
-                  <div style={{opacity:.6,fontSize:12}}>
-                    {s.cluster}
-                  </div>
-                </div>
-
-                <div className={s.band.cls} style={{fontWeight:900}}>
-                  {s.readiness}%
-                </div>
+      <div style={{ display: "grid", gap: 16 }}>
+        {sectors.map((s, i) => (
+          <div key={i} className="card">
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontWeight: 900 }}>{s.sector}</div>
+                <div style={{ fontSize: 12, opacity: .6 }}>{s.cluster}</div>
               </div>
-
-              <div style={{marginTop:10, fontSize:13, opacity:.8}}>
-                حرجة {s.critical} — متوسطة {s.medium} — إجمالي {s.total}
+              <div className={s.band.cls} style={{ fontWeight: 900 }}>
+                {s.readiness}%
               </div>
-
-              <div style={{marginTop:8, fontSize:13}}>
-                HR90: {s.hrP90 ?? "—"} | Temp90: {s.tempP90 ?? "—"} | Hyd90: {s.hydP90 ?? "—"}
-              </div>
-
-              <div style={{marginTop:8}}>
-                {riskScore >= 4 &&
-                  <span className="red">توقع تصاعد خلال 20 دقيقة</span>}
-                {riskScore >= 2 && riskScore < 4 &&
-                  <span className="amber">مراقبة متقدمة</span>}
-                {riskScore < 2 &&
-                  <span className="green">مستقر حالياً</span>}
-              </div>
-
-              <div style={{display:"flex", gap:8, marginTop:12}}>
-                <button className="btn" onClick={()=>applyIntervention(s,"cool")}>
-                  تعزيز تبريد
-                </button>
-                <button className="btn" onClick={()=>applyIntervention(s,"move")}>
-                  نقل فريق
-                </button>
-                <button className="btn" onClick={()=>applyIntervention(s,"notify")}>
-                  تنبيه حملات
-                </button>
-              </div>
-
             </div>
-          )
-        })}
 
+            <div style={{ marginTop: 10 }}>
+              حرجة {s.critical} — متوسطة {s.medium} — إجمالي {s.total}
+            </div>
+
+            <div style={{ marginTop: 6, fontSize: 13 }}>
+              HR90: {s.hrP90 ?? "—"} |
+              Temp90: {s.tempP90 ?? "—"} |
+              Hyd90: {s.hydP90 ?? "—"}
+            </div>
+          </div>
+        ))}
       </div>
-
     </main>
   )
 }
