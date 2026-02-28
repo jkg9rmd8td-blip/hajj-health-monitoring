@@ -1,0 +1,76 @@
+[
+  {
+    "event_id": "EVT-0001",
+    "ts": "2026-02-28T08:10:00Z",
+    "type": "ALERT_RAISED",
+    "severity": "CRITICAL",
+    "pilgrim_id": "HHM-002",
+    "campaign_id": "CAMP-ARAFAT-01",
+    "sector": "عرفات",
+    "reason": "HR>=130 + TEMP>=38.5",
+    "owner": "SYSTEM"
+  },
+  {
+    "event_id": "EVT-0002",
+    "ts": "2026-02-28T08:14:00Z",
+    "type": "ALERT_ACK",
+    "severity": "CRITICAL",
+    "pilgrim_id": "HHM-002",
+    "campaign_id": "CAMP-ARAFAT-01",
+    "sector": "عرفات",
+    "owner": "CAMPAIGN_LEAD"
+  },
+  {
+    "event_id": "EVT-0003",
+    "ts": "2026-02-28T08:21:00Z",
+    "type": "DISPATCH",
+    "severity": "CRITICAL",
+    "pilgrim_id": "HHM-002",
+    "campaign_id": "CAMP-ARAFAT-01",
+    "sector": "عرفات",
+    "owner": "EMS"
+  },
+  {
+    "event_id": "EVT-0004",
+    "ts": "2026-02-28T08:33:00Z",
+    "type": "CASE_CLOSED",
+    "severity": "CRITICAL",
+    "pilgrim_id": "HHM-002",
+    "campaign_id": "CAMP-ARAFAT-01",
+    "sector": "عرفات",
+    "outcome": "STABILIZED",
+    "owner": "MEDICAL_POINT"
+  },
+  {
+    "event_id": "EVT-0010",
+    "ts": "2026-02-28T09:05:00Z",
+    "type": "ALERT_RAISED",
+    "severity": "WARNING",
+    "pilgrim_id": "HHM-005",
+    "campaign_id": "CAMP-MINA-03",
+    "sector": "منى 3",
+    "reason": "HydrationRisk>=60",
+    "owner": "SYSTEM"
+  },
+  {
+    "event_id": "EVT-0011",
+    "ts": "2026-02-28T09:17:00Z",
+    "type": "RECOMMENDATION_SENT",
+    "severity": "WARNING",
+    "pilgrim_id": "HHM-005",
+    "campaign_id": "CAMP-MINA-03",
+    "sector": "منى 3",
+    "action": "REST+WATER",
+    "owner": "SYSTEM"
+  },
+  {
+    "event_id": "EVT-0012",
+    "ts": "2026-02-28T09:33:00Z",
+    "type": "ALERT_ACK",
+    "severity": "WARNING",
+    "pilgrim_id": "HHM-005",
+    "campaign_id": "CAMP-MINA-03",
+    "sector": "منى 3",
+    "owner": "CAMPAIGN_LEAD"
+  }
+]
