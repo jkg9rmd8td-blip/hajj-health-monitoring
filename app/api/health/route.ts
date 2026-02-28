@@ -1,27 +1,34 @@
 import { NextResponse } from "next/server"
-
-let healthRecords: any[] = []
-
-export async function GET() {
-  return NextResponse.json(healthRecords)
-}
+import { classifyRisk } from "@/app/core/risk-engine"
+import { readData, writeData } from "@/app/core/storage"
+import { logEvent } from "@/app/core/logger"
 
 export async function POST(req: Request) {
   const body = await req.json()
 
+  const data = readData()
+
+  const risk = classifyRisk(body)
+
   const record = {
     id: Date.now(),
-    name: body.name,
-    heartRate: body.heartRate,
-    temperature: body.temperature,
-    status:
-      body.heartRate > 120 || body.temperature > 39
-        ? "critical"
-        : "normal",
-    timestamp: new Date()
+    ...body,
+    risk,
+    timestamp: new Date().toISOString()
   }
 
-  healthRecords.push(record)
+  data.push(record)
+  writeData(data)
+
+  logEvent({
+    type: "HEALTH_UPDATE",
+    pilgrim: body.name,
+    risk
+  })
 
   return NextResponse.json(record)
+}
+
+export async function GET() {
+  return NextResponse.json(readData())
 }
