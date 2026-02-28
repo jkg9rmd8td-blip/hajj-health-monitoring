@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 
 export const dynamic = "force-dynamic"
 
-const role = "NATIONAL_ADMIN" // لاحقاً يتحول إلى نظام صلاحيات حقيقي
+const role = "NATIONAL_ADMIN"
 
 export default function RootLayout({ children }) {
 
@@ -13,7 +13,7 @@ export default function RootLayout({ children }) {
 
   const nav = [
     { name: "الرئيسية", path: "/" },
-    { name: "الخريطة التشغيلية", path: "/map" },
+    { name: "الخريطة", path: "/map" },
     { name: "الحملات", path: "/campaigns" },
     { name: "القطاعات", path: "/sectors" },
     { name: "المحاكاة", path: "/simulation" },
@@ -26,7 +26,7 @@ export default function RootLayout({ children }) {
       <body style={{
         margin: 0,
         background: "#0B1220",
-        color: "white",
+        color: "#E5E7EB",
         fontFamily: "system-ui"
       }}>
 
@@ -34,25 +34,33 @@ export default function RootLayout({ children }) {
 
           {/* Sidebar */}
           <aside style={{
-            width: 260,
+            width: 250,
             background: "#111827",
             padding: 20,
-            borderLeft: "1px solid rgba(255,255,255,0.08)"
+            borderLeft: "1px solid rgba(255,255,255,0.05)"
           }}>
 
-            <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 30 }}>
-              🇸🇦 منصة المسار الصحي
+            <div style={{
+              fontWeight: 900,
+              fontSize: 18,
+              marginBottom: 25
+            }}>
+              🇸🇦 المسار الصحي
             </div>
 
-            <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ display: "grid", gap: 6 }}>
               {nav.map((item, i) => (
                 <Link key={i} href={item.path}
                   style={{
                     padding: "10px 14px",
                     borderRadius: 8,
                     textDecoration: "none",
-                    color: pathname === item.path ? "#38BDF8" : "#D1D5DB",
-                    background: pathname === item.path ? "rgba(56,189,248,0.08)" : "transparent"
+                    fontSize: 14,
+                    color: pathname === item.path ? "#38BDF8" : "#9CA3AF",
+                    background: pathname === item.path
+                      ? "rgba(56,189,248,0.1)"
+                      : "transparent",
+                    transition: "0.2s"
                   }}>
                   {item.name}
                 </Link>
@@ -64,10 +72,10 @@ export default function RootLayout({ children }) {
               padding: 12,
               background: "rgba(255,255,255,0.05)",
               borderRadius: 8,
-              fontSize: 13
+              fontSize: 12
             }}>
-              الدور الحالي:
-              <div style={{ fontWeight: 700, marginTop: 4 }}>
+              الدور:
+              <div style={{ fontWeight: 700 }}>
                 {role}
               </div>
             </div>
@@ -79,27 +87,42 @@ export default function RootLayout({ children }) {
 
             {/* Top Bar */}
             <header style={{
-              height: 70,
+              height: 65,
               background: "#0F172A",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               padding: "0 24px",
-              borderBottom: "1px solid rgba(255,255,255,0.08)"
+              borderBottom: "1px solid rgba(255,255,255,0.05)"
             }}>
               <div style={{ fontWeight: 700 }}>
-                غرفة العمليات الوطنية
+                غرفة العمليات الوطنية للحج
               </div>
 
               <div style={{
                 padding: "6px 14px",
                 background: "rgba(34,197,94,0.15)",
                 borderRadius: 20,
-                fontSize: 13
+                fontSize: 12,
+                fontWeight: 600
               }}>
                 مستوى التأهب: مستقر
               </div>
             </header>
+
+            {/* Executive Strip */}
+            <div style={{
+              background: "#111827",
+              padding: "14px 24px",
+              borderBottom: "1px solid rgba(255,255,255,0.05)",
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 13
+            }}>
+              <div>آخر تحديث: مباشر</div>
+              <div>الوضع الوطني: مستقر</div>
+              <div>نظام تنبؤ نشط</div>
+            </div>
 
             {/* Page Content */}
             <main style={{
