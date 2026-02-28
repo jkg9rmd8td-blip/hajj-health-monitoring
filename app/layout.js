@@ -39,6 +39,7 @@ export default function RootLayout({ children }) {
 
               <Link className="navlink" href="/operations">التشغيل</Link>
               <Link className="navlink" href="/campaigns">الحملات</Link>
+              <Link className="navlink" href="/ai-ops">AI-Ops</Link>
               <Link className="navlink" href="/campaigns-sla">امتثال SLA</Link>
               <Link className="navlink" href="/audit">التدقيق</Link>
               <Link className="navlink" href="/movement">التحركات</Link>
