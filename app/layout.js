@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useState } from "react"
 
 export const dynamic = "force-dynamic"
 
@@ -10,6 +11,7 @@ const role = "NATIONAL_ADMIN"
 export default function RootLayout({ children }) {
 
   const pathname = usePathname()
+  const [open, setOpen] = useState(false)
 
   const nav = [
     { name: "الرئيسية", path: "/" },
@@ -37,20 +39,22 @@ export default function RootLayout({ children }) {
             width: 250,
             background: "#111827",
             padding: 20,
-            borderLeft: "1px solid rgba(255,255,255,0.05)"
+            borderLeft: "1px solid rgba(255,255,255,0.05)",
+            position: "fixed",
+            height: "100vh",
+            right: open ? 0 : -260,
+            transition: "0.3s",
+            zIndex: 1000
           }}>
 
-            <div style={{
-              fontWeight: 900,
-              fontSize: 18,
-              marginBottom: 25
-            }}>
+            <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 25 }}>
               🇸🇦 المسار الصحي
             </div>
 
             <div style={{ display: "grid", gap: 6 }}>
               {nav.map((item, i) => (
                 <Link key={i} href={item.path}
+                  onClick={() => setOpen(false)}
                   style={{
                     padding: "10px 14px",
                     borderRadius: 8,
@@ -59,8 +63,7 @@ export default function RootLayout({ children }) {
                     color: pathname === item.path ? "#38BDF8" : "#9CA3AF",
                     background: pathname === item.path
                       ? "rgba(56,189,248,0.1)"
-                      : "transparent",
-                    transition: "0.2s"
+                      : "transparent"
                   }}>
                   {item.name}
                 </Link>
@@ -82,53 +85,80 @@ export default function RootLayout({ children }) {
 
           </aside>
 
-          {/* Main */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          {/* Overlay */}
+          {open && (
+            <div
+              onClick={() => setOpen(false)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0,0,0,0.6)",
+                zIndex: 900
+              }}
+            />
+          )}
+
+          {/* Main Area */}
+          <div style={{ flex: 1, marginRight: 0 }}>
 
             {/* Top Bar */}
             <header style={{
-              height: 65,
+              height: 60,
               background: "#0F172A",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              padding: "0 24px",
+              padding: "0 20px",
               borderBottom: "1px solid rgba(255,255,255,0.05)"
             }}>
+              <button
+                onClick={() => setOpen(true)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "white",
+                  fontSize: 20,
+                  cursor: "pointer"
+                }}>
+                ☰
+              </button>
+
               <div style={{ fontWeight: 700 }}>
-                غرفة العمليات الوطنية للحج
+                غرفة العمليات الوطنية
               </div>
 
               <div style={{
-                padding: "6px 14px",
+                padding: "5px 12px",
                 background: "rgba(34,197,94,0.15)",
                 borderRadius: 20,
                 fontSize: 12,
                 fontWeight: 600
               }}>
-                مستوى التأهب: مستقر
+                مستقر
               </div>
             </header>
 
             {/* Executive Strip */}
             <div style={{
               background: "#111827",
-              padding: "14px 24px",
+              padding: "10px 20px",
+              fontSize: 12,
               borderBottom: "1px solid rgba(255,255,255,0.05)",
               display: "flex",
-              justifyContent: "space-between",
-              fontSize: 13
+              flexWrap: "wrap",
+              gap: 15,
+              justifyContent: "space-between"
             }}>
               <div>آخر تحديث: مباشر</div>
-              <div>الوضع الوطني: مستقر</div>
               <div>نظام تنبؤ نشط</div>
+              <div>مؤشر وطني: 100%</div>
             </div>
 
             {/* Page Content */}
             <main style={{
-              flex: 1,
-              padding: 30,
-              overflowY: "auto"
+              padding: 20,
+              maxWidth: 1400,
+              margin: "0 auto"
             }}>
               {children}
             </main>
