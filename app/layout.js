@@ -1,3 +1,4 @@
+import "./globals.css"
 export const metadata = {
   title: "منصة رصد الصحة في الحج",
   description: "منصة تنفيذية بتصميم فخم مستوحى من Apple VisionOS"
