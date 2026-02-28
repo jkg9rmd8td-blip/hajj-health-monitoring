@@ -11,7 +11,7 @@ export default function RootLayout({ children }) {
     <html lang="ar" dir="rtl">
       <head>
         <link
-          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700;800&display=swap"
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700;800;900&display=swap"
           rel="stylesheet"
         />
       </head>
