@@ -1,154 +1,128 @@
 "use client"
-
 import { useEffect, useMemo, useState } from "react"
 
-function normalizeRiskArabic(v) {
-  const x = String(v ?? "").trim()
-  if (x.includes("حرج")) return "critical"
-  if (x.includes("متوسط")) return "medium"
-  return "low"
-}
+function norm(v){ const x=String(v??"").trim(); if(x.includes("حرج"))return"critical"; if(x.includes("متوسط"))return"medium"; return"low"; }
+function idx(t,c,m){ if(!t)return 100; let s=100-Math.round((c/t)*100*1.25)-Math.round((m/t)*100*0.55); return Math.max(0,Math.min(100,s)); }
+function band(s){ if(s>=85)return{t:"مستقر",cls:"green"}; if(s>=70)return{t:"مراقبة",cls:"amber"}; return{t:"تأهب",cls:"red"}; }
 
-function readinessIndex({ total, critical, medium }) {
-  // مؤشر جاهزية تشغيلي (MVP) قابل للتطوير
-  // كلما ارتفعت الحرجة والمتوسطة انخفضت الجاهزية
-  if (!total) return 100
-  const cRate = (critical / total) * 100
-  const mRate = (medium / total) * 100
+export default function Sectors(){
+  const [data,setData]=useState([])
+  const [resources,setResources]=useState([])
+  const [pick,setPick]=useState(null)
 
-  let score = 100
-  score -= Math.round(cRate * 1.25)   // وزن أعلى للحالات الحرجة
-  score -= Math.round(mRate * 0.55)
+  useEffect(()=>{
+    fetch("/api/pilgrims",{cache:"no-store"}).then(r=>r.json()).then(x=>setData(Array.isArray(x)?x:[])).catch(()=>setData([]))
+    fetch("/api/resources",{cache:"no-store"}).then(r=>r.json()).then(x=>setResources(Array.isArray(x)?x:[])).catch(()=>setResources([]))
+  },[])
 
-  // حد أدنى وأعلى
-  if (score < 0) score = 0
-  if (score > 100) score = 100
-  return score
-}
-
-function band(score) {
-  if (score >= 85) return { label: "جاهزية عالية", cls: "green" }
-  if (score >= 70) return { label: "جاهزية متوسطة", cls: "amber" }
-  return { label: "جاهزية منخفضة", cls: "red" }
-}
-
-function recommendations(sector, s) {
-  const rec = []
-  if (s.critical >= 2) {
-    rec.push("رفع التأهب (أحمر): توجيه فريق إسعافي ميداني وتعزيز مسار الإحالة.")
-    rec.push("تعزيز نقاط الفرز القريبة وتفعيل مراقبة لصيقة للحالات المتوسطة.")
-  } else if (s.medium >= 3) {
-    rec.push("رفع المتابعة (أصفر): تعزيز التوعية الوقائية للحملات داخل القطاع.")
-    rec.push("رفع التواجد الوقائي (مياه/تبريد) عند نقاط الحركة.")
-  } else {
-    rec.push("الاستمرار في الرصد وفق الوضع الطبيعي دون تصعيد.")
-  }
-
-  if (String(sector).includes("منى") && (s.critical + s.medium) >= 3) {
-    rec.push("إجراء بيئي: رفع كثافة التبريد/الرش في محيط القطاع خلال الذروة.")
-  }
-
-  return rec
-}
-
-export default function Sectors() {
-  const [data, setData] = useState([])
-
-  useEffect(() => {
-    fetch("/api/pilgrims", { cache: "no-store" })
-      .then(r => r.json())
-      .then(setData)
-      .catch(() => setData([]))
-  }, [])
-
-  const sectors = useMemo(() => {
-    const map = new Map()
-
-    for (const p of data) {
-      const sector = String(p.clinic_location ?? p.location ?? "غير محدد")
-      const risk = normalizeRiskArabic(p.risk_level ?? p.risk)
-      const e = map.get(sector) ?? { sector, total: 0, critical: 0, medium: 0, low: 0 }
-      e.total += 1
-      e[risk] += 1
-      map.set(sector, e)
+  const sectors = useMemo(()=>{
+    const map=new Map()
+    for(const p of data){
+      const s=String(p.clinic_location??p.location??"غير محدد")
+      const r=norm(p.risk_level??p.risk)
+      const e=map.get(s)??{sector:s,total:0,critical:0,medium:0,low:0,sample:[]}
+      e.total++; e[r]++; if(e.sample.length<4) e.sample.push(p)
+      map.set(s,e)
     }
+    const arr=Array.from(map.values()).map(x=>{
+      const score=idx(x.total,x.critical,x.medium)
+      const b=band(score)
+      const needEMS = x.critical>=2 ? 2 : x.critical===1 ? 1 : 0
+      const needCooling = (x.critical+x.medium)>=4 ? 2 : (x.critical+x.medium)>=2 ? 1 : 0
+      return {...x, score, b, needEMS, needCooling}
+    }).sort((a,b)=>a.score-b.score)
+    return arr
+  },[data])
 
-    const arr = Array.from(map.values()).map(s => {
-      const score = readinessIndex(s)
-      const b = band(score)
-      return {
-        ...s,
-        readiness: score,
-        bandLabel: b.label,
-        bandClass: b.cls,
-        actions: recommendations(s.sector, s),
-      }
-    })
-
-    // ترتيب: الأقل جاهزية أولاً
-    return arr.sort((a, b) => (a.readiness - b.readiness) || (b.critical - a.critical))
-  }, [data])
+  const current = pick ? sectors.find(s=>s.sector===pick) ?? sectors[0] : sectors[0]
+  const sectorResources = useMemo(()=>{
+    if(!current) return []
+    return resources.filter(r=>String(r.sector)===String(current.sector))
+  },[resources,current])
 
   return (
     <main>
-      <div className="sectionTitle">مؤشر جاهزية القطاعات الصحية (Sector Readiness)</div>
+      <div className="sectionTitle">القطاعات — الجاهزية واحتياج الموارد</div>
 
-      <div className="card" style={{ opacity: .82, fontSize: 13, lineHeight: 1.9 }}>
-        يعرض هذا المؤشر جاهزية كل قطاع بناءً على توزيع مستويات الخطورة (حرج/متوسط/منخفض).
-        المؤشر تشغيلي (MVP) وسيتم ترقيته لاحقاً بنماذج تنبؤية (AI) ومؤشرات السوار (نبض/حرارة/نشاط).
-      </div>
-
-      <div className="sectionTitle">ترتيب القطاعات حسب الجاهزية</div>
-      <div className="card" style={{ padding: 0 }}>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>القطاع</th>
-              <th>الجاهزية</th>
-              <th>التصنيف</th>
-              <th>إجمالي</th>
-              <th>حرج</th>
-              <th>متوسط</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sectors.map((s, i) => (
-              <tr key={i}>
-                <td style={{ fontWeight: 900 }}>{s.sector}</td>
-                <td className={s.bandClass} style={{ fontWeight: 900 }}>{s.readiness}%</td>
-                <td style={{ opacity: .9 }}>{s.bandLabel}</td>
-                <td>{s.total}</td>
-                <td className="red" style={{ fontWeight: 900 }}>{s.critical}</td>
-                <td className="amber" style={{ fontWeight: 900 }}>{s.medium}</td>
-              </tr>
-            ))}
-
-            {sectors.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ textAlign: "center", opacity: .6, padding: 18 }}>
-                  لا توجد بيانات.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="sectionTitle">التوصيات التشغيلية حسب القطاع</div>
       <div className="grid2">
-        {sectors.slice(0, 6).map((s, i) => (
-          <div className="card" key={i}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-              <div style={{ fontWeight: 900 }}>{s.sector}</div>
-              <div className={s.bandClass} style={{ fontWeight: 900 }}>
-                جاهزية {s.readiness}%
-              </div>
-            </div>
-            <ul style={{ margin: "10px 0 0", paddingRight: 18, opacity: .9, lineHeight: 1.9, fontSize: 13 }}>
-              {s.actions.map((a, idx) => <li key={idx}>{a}</li>)}
-            </ul>
+        <div className="card">
+          <div className="split">
+            <div style={{fontWeight:900}}>قائمة القطاعات</div>
+            <span className="badge">الأقل جاهزية أولاً</span>
           </div>
-        ))}
+
+          <div style={{display:"grid",gap:10,marginTop:12}}>
+            {sectors.map((s,i)=>(
+              <button key={i} className="tile" style={{textAlign:"right",cursor:"pointer",color:"white"}}
+                onClick={()=>setPick(s.sector)}>
+                <div className="split">
+                  <b>{s.sector}</b>
+                  <b className={s.b.cls}>{s.score}%</b>
+                </div>
+                <div style={{opacity:.85,fontSize:12,marginTop:8,lineHeight:1.8}}>
+                  حرج <b className="red">{s.critical}</b> — متوسط <b className="amber">{s.medium}</b> — إجمالي {s.total}
+                  <br/>
+                  احتياج: إسعاف <b>{s.needEMS}</b> — تبريد <b>{s.needCooling}</b>
+                </div>
+              </button>
+            ))}
+            {sectors.length===0 && <div style={{opacity:.7}}>لا توجد بيانات.</div>}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="split">
+            <div style={{fontWeight:900}}>تفاصيل القطاع</div>
+            {current && <span className={"badge "+current.b.cls}>{current.b.t}</span>}
+          </div>
+
+          {!current && <div style={{opacity:.7,marginTop:12}}>اختر قطاعاً.</div>}
+
+          {current && (
+            <>
+              <div className="grid3" style={{marginTop:12}}>
+                <div className="card"><div className="kpiLabel">جاهزية</div><div className={"kpiValue "+current.b.cls}>{current.score}%</div></div>
+                <div className="card"><div className="kpiLabel">حرجة</div><div className="kpiValue red">{current.critical}</div></div>
+                <div className="card"><div className="kpiLabel">متوسطة</div><div className="kpiValue amber">{current.medium}</div></div>
+              </div>
+
+              <div className="sectionTitle">احتياج الموارد (Auto)</div>
+              <div className="grid3">
+                <div className="tile split"><span style={{opacity:.8}}>فرق إسعاف مطلوبة</span><b>{current.needEMS}</b></div>
+                <div className="tile split"><span style={{opacity:.8}}>نقاط تبريد مطلوبة</span><b>{current.needCooling}</b></div>
+                <div className="tile split"><span style={{opacity:.8}}>موارد موجودة</span><b>{sectorResources.length}</b></div>
+              </div>
+
+              <div className="sectionTitle">الموارد في القطاع</div>
+              <div className="card" style={{padding:0}}>
+                <table className="table">
+                  <thead><tr><th>المعرف</th><th>النوع</th><th>الحالة</th></tr></thead>
+                  <tbody>
+                    {sectorResources.map((r,i)=>(
+                      <tr key={i}><td><b>{r.id}</b></td><td>{r.type}</td><td>{r.status}</td></tr>
+                    ))}
+                    {sectorResources.length===0 && <tr><td colSpan={3} style={{opacity:.7,padding:14}}>لا توجد موارد مسجلة لهذا القطاع.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="sectionTitle">عينات حالات</div>
+              <div style={{display:"grid",gap:10}}>
+                {current.sample.map((p,i)=>(
+                  <div key={i} className="tile">
+                    <div className="split">
+                      <b>{p.id ?? "—"}</b>
+                      <b className={norm(p.risk_level??p.risk)==="critical"?"red":norm(p.risk_level??p.risk)==="medium"?"amber":"green"}>
+                        {p.risk_level ?? "—"}
+                      </b>
+                    </div>
+                    <div style={{opacity:.8,fontSize:13,marginTop:6}}>{p.health_status ?? "—"} — عمر {p.age ?? "—"}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </main>
   )
