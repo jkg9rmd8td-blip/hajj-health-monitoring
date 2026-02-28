@@ -32,7 +32,7 @@ function riskLabel(r) {
 export default function Campaigns() {
   const [data, setData] = useState([])
   const [selected, setSelected] = useState(null)
-
+ const [events, setEvents] = useState([])
   useEffect(() => {
     fetch("/api/pilgrims", { cache: "no-store" })
       .then(r => r.json())
