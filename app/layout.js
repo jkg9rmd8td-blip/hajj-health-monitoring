@@ -16,7 +16,6 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body>
-        {/* شريط علوي رسمي */}
         <div className="officialTopbar">
           <div className="topbarRow">
             <span>المملكة العربية السعودية</span>
@@ -26,24 +25,19 @@ export default function RootLayout({ children }) {
         </div>
 
         <div className="shell">
-          {/* رأس المنصة */}
           <div className="navbar">
             <div className="brand">
               <div className="brandTitle">منصة المسار الصحي التنبؤية</div>
-              <div className="brandSub">غرفة عمليات وطنية لرصد المخاطر الصحية والتوجيه الاستباقي</div>
+              <div className="brandSub">غرفة عمليات وطنية لرصد المخاطر والتوجيه الاستباقي</div>
             </div>
 
-            {/* ترتيب قيادي: قيادة → تشغيل → حوكمة */}
             <nav className="navlinks">
               <Link className="navlink" href="/">القيادة</Link>
               <Link className="navlink" href="/national">المؤشر الوطني</Link>
               <Link className="navlink" href="/sectors">القطاعات</Link>
               <Link className="navlink" href="/map">الخريطة</Link>
 
-              <Link className="navlink" href="/analytics">التحليلات</Link>
               <Link className="navlink" href="/operations">التشغيل</Link>
-              <Link className="navlink" href="/alerts">التنبيهات</Link>
-
               <Link className="navlink" href="/campaigns">الحملات</Link>
               <Link className="navlink" href="/campaigns-sla">امتثال SLA</Link>
               <Link className="navlink" href="/audit">التدقيق</Link>
@@ -52,8 +46,7 @@ export default function RootLayout({ children }) {
 
           {children}
 
-          {/* تذييل رسمي */}
-          <div style={{ marginTop: 26, opacity: .65, fontSize: 12 }}>
+          <div className="footerNote">
             © {new Date().getFullYear()} — منصة تشغيلية تجريبية قابلة للتوسع — بيانات مجهولة الهوية لأغراض السلامة.
           </div>
         </div>
