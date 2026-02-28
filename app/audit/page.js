@@ -1,104 +1,80 @@
 "use client"
-
 import { useEffect, useMemo, useState } from "react"
 
-function normalizeRiskArabic(v) {
-  const x = String(v ?? "").trim()
-  if (x.includes("حرج")) return "critical"
-  if (x.includes("متوسط")) return "medium"
-  return "low"
-}
+export default function Audit(){
+  const [events,setEvents]=useState([])
+  useEffect(()=>{
+    fetch("/api/events",{cache:"no-store"}).then(r=>r.json()).then(x=>setEvents(Array.isArray(x)?x:[])).catch(()=>setEvents([]))
+  },[])
 
-function eventType(risk) {
-  if (risk === "critical") return "تنبيه حرج"
-  if (risk === "medium") return "تنبيه وقائي"
-  return "رصد اعتيادي"
-}
+  const cases = useMemo(()=>{
+    const raised=events.filter(e=>e.type==="ALERT_RAISED")
+    const ack=events.filter(e=>e.type==="ALERT_ACK")
+    const dispatch=events.filter(e=>e.type==="DISPATCH")
+    const closed=events.filter(e=>e.type==="CASE_CLOSED")
 
-export default function Audit() {
-  const [data, setData] = useState([])
-  const [now, setNow] = useState(null)
+    const rows=[]
+    for(const r of raised){
+      const a=ack.find(x=>x.pilgrim_id===r.pilgrim_id && x.sector===r.sector && new Date(x.ts)>=new Date(r.ts))
+      const d=dispatch.find(x=>x.pilgrim_id===r.pilgrim_id && x.sector===r.sector && new Date(x.ts)>=new Date(r.ts))
+      const c=closed.find(x=>x.pilgrim_id===r.pilgrim_id && x.sector===r.sector && new Date(x.ts)>=new Date(r.ts))
+      rows.push({
+        pilgrim_id:r.pilgrim_id, campaign_id:r.campaign_id, sector:r.sector, severity:r.severity,
+        raised:r.ts, ack:a?.ts ?? null, dispatch:d?.ts ?? null, closed:c?.ts ?? null
+      })
+    }
+    rows.sort((a,b)=> new Date(b.raised)-new Date(a.raised))
+    return rows
+  },[events])
 
-  useEffect(() => {
-    fetch("/api/pilgrims", { cache: "no-store" })
-      .then(r => r.json())
-      .then((rows) => {
-        setData(rows)
-        setNow(new Date())
-      })
-      .catch(() => {
-        setData([])
-        setNow(new Date())
-      })
-  }, [])
-
-  const logs = useMemo(() => {
-    const ts = now ? now.toISOString() : new Date().toISOString()
-    return (Array.isArray(data) ? data : [])
-      .map((p, idx) => {
-        const risk = normalizeRiskArabic(p.risk_level)
-        return {
-          time: ts,
-          type: eventType(risk),
-          severity: risk,
-          actor: "النظام الآلي",
-          subject: p.id ?? `ROW-${idx + 1}`,
-          location: p.clinic_location ?? "غير محدد",
-          note: p.health_status ?? "—"
-        }
-      })
-      .sort((a, b) => {
-        const w = (x) => x.severity === "critical" ? 3 : x.severity === "medium" ? 2 : 1
-        return w(b) - w(a)
-      })
-      .slice(0, 30)
-  }, [data, now])
+  const open = cases.filter(c=>!c.closed)
 
   return (
     <main>
-      <div className="sectionTitle">سجل التدقيق (Audit Log)</div>
-
-      <div className="card" style={{ opacity: .8, fontSize: 13, lineHeight: 1.9 }}>
-        يعرض هذا السجل الأحداث التي رصدها النظام لأغراض الشفافية والتحسين المستمر.
-        في المرحلة القادمة سيتم تسجيل: وقت الاستلام، وقت الاستجابة، الجهة المنفذة، والنتيجة.
+      <div className="split" style={{marginTop:10}}>
+        <div>
+          <div className="sectionTitle" style={{margin:0}}>التدقيق — سجل سيادي (Audit)</div>
+          <div style={{opacity:.75,fontSize:13,lineHeight:1.8}}>سجل قابل للمراجعة: تنبيه → استلام → إرسال → إغلاق.</div>
+        </div>
+        <span className="badge">قضايا مفتوحة: <b className={open.length? "amber":"green"}>{open.length}</b></span>
       </div>
 
-      <div className="sectionTitle">آخر الأحداث</div>
-      <div className="card" style={{ padding: 0 }}>
+      <div className="sectionTitle">قضايا مفتوحة الآن</div>
+      <div className="card" style={{padding:0}}>
         <table className="table">
-          <thead>
-            <tr>
-              <th>الوقت</th>
-              <th>النوع</th>
-              <th>الشدة</th>
-              <th>المعرف</th>
-              <th>الموقع</th>
-              <th>المسؤول</th>
-              <th>ملاحظة</th>
-            </tr>
-          </thead>
+          <thead><tr><th>الحاج</th><th>الحملة</th><th>القطاع</th><th>الشدة</th><th>وقت التنبيه</th><th>استلام</th><th>إرسال</th></tr></thead>
           <tbody>
-            {logs.map((l, i) => (
+            {open.slice(0,12).map((c,i)=>(
               <tr key={i}>
-                <td style={{ opacity: .75 }}>{String(l.time).slice(11, 19)}</td>
-                <td style={{ fontWeight: 900 }}>{l.type}</td>
-                <td className={l.severity === "critical" ? "red" : l.severity === "medium" ? "amber" : "green"} style={{ fontWeight: 900 }}>
-                  {l.severity === "critical" ? "حرج" : l.severity === "medium" ? "متوسط" : "منخفض"}
+                <td><b>{c.pilgrim_id}</b></td><td>{c.campaign_id}</td><td>{c.sector}</td>
+                <td className={String(c.severity).includes("CRIT") ? "red":"amber"} style={{fontWeight:900}}>
+                  {String(c.severity).includes("CRIT") ? "حرج":"وقائي"}
                 </td>
-                <td>{l.subject}</td>
-                <td>{l.location}</td>
-                <td>{l.actor}</td>
-                <td style={{ opacity: .9 }}>{l.note}</td>
+                <td>{new Date(c.raised).toLocaleTimeString("ar-SA")}</td>
+                <td>{c.ack ? new Date(c.ack).toLocaleTimeString("ar-SA") : "—"}</td>
+                <td>{c.dispatch ? new Date(c.dispatch).toLocaleTimeString("ar-SA") : "—"}</td>
               </tr>
             ))}
+            {open.length===0 && <tr><td colSpan={7} style={{opacity:.7,padding:14}}>لا توجد قضايا مفتوحة.</td></tr>}
+          </tbody>
+        </table>
+      </div>
 
-            {logs.length === 0 && (
-              <tr>
-                <td colSpan={7} style={{ textAlign: "center", opacity: .6, padding: 18 }}>
-                  لا توجد بيانات.
-                </td>
+      <div className="sectionTitle">آخر السجل (Timeline)</div>
+      <div className="card" style={{padding:0}}>
+        <table className="table">
+          <thead><tr><th>الحاج</th><th>الحملة</th><th>القطاع</th><th>تنبيه</th><th>استلام</th><th>إرسال</th><th>إغلاق</th></tr></thead>
+          <tbody>
+            {cases.slice(0,20).map((c,i)=>(
+              <tr key={i}>
+                <td><b>{c.pilgrim_id}</b></td><td>{c.campaign_id}</td><td>{c.sector}</td>
+                <td>{new Date(c.raised).toLocaleTimeString("ar-SA")}</td>
+                <td>{c.ack ? new Date(c.ack).toLocaleTimeString("ar-SA") : "—"}</td>
+                <td>{c.dispatch ? new Date(c.dispatch).toLocaleTimeString("ar-SA") : "—"}</td>
+                <td>{c.closed ? new Date(c.closed).toLocaleTimeString("ar-SA") : "—"}</td>
               </tr>
-            )}
+            ))}
+            {cases.length===0 && <tr><td colSpan={7} style={{opacity:.7,padding:14}}>لا توجد أحداث بعد. أضف events.json</td></tr>}
           </tbody>
         </table>
       </div>
