@@ -1,132 +1,93 @@
 "use client"
-
 import { useEffect, useMemo, useState } from "react"
 
-function normalizeRiskArabic(v) {
-  const x = String(v ?? "").trim()
-  if (x.includes("حرج")) return "critical"
-  if (x.includes("متوسط")) return "medium"
-  return "low"
-}
+function mins(a,b){ const x=new Date(a).getTime(), y=new Date(b).getTime(); if(!isFinite(x)||!isFinite(y))return null; return Math.max(0,Math.round((y-x)/60000)); }
+function grade(s){ if(s>=90)return"A+"; if(s>=80)return"A"; if(s>=70)return"B"; if(s>=55)return"C"; return"D"; }
 
-function grade(score) {
-  if (score >= 90) return "A+"
-  if (score >= 80) return "A"
-  if (score >= 70) return "B"
-  if (score >= 55) return "C"
-  return "D"
-}
+export default function SLABoard(){
+  const [events,setEvents]=useState([])
+  useEffect(()=>{ fetch("/api/events",{cache:"no-store"}).then(r=>r.json()).then(x=>setEvents(Array.isArray(x)?x:[])).catch(()=>setEvents([])) },[])
 
-// SLA تجريبي للعرض: (زمن استجابة + تنفيذ توصيات) يتم توليده مبدئياً
-function pseudoSLA(campaignId) {
-  // ثابت شبه عشوائي حسب اسم الحملة (بدون مكتبات)
-  let h = 0
-  const s = String(campaignId ?? "")
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 1000
-  const responseMin = 3 + (h % 18)           // 3 إلى 20 دقيقة
-  const complianceExec = 55 + (h % 41)       // 55% إلى 95%
-  const violations = h % 4                   // 0..3
-  return { responseMin, complianceExec, violations }
-}
-
-function complianceScore(c) {
-  const total = c.total || 1
-  const criticalRate = (c.critical / total) * 100
-  const mediumRate = (c.medium / total) * 100
-
-  const sla = c.sla
-
-  // الامتثال = (تقليل الحرجة/المتوسطة) + (سرعة الاستجابة) + (تنفيذ التوصيات) - (مخالفات)
-  let score = 100
-  score -= Math.round(criticalRate * 1.2)
-  score -= Math.round(mediumRate * 0.5)
-
-  // زمن الاستجابة: كل دقيقة فوق 8 تُخصم
-  score -= Math.max(0, sla.responseMin - 8) * 2
-
-  // تنفيذ التوصيات: يضيف نقاط
-  score += Math.round((sla.complianceExec - 70) * 0.4)
-
-  // المخالفات: خصم
-  score -= sla.violations * 6
-
-  if (score < 0) score = 0
-  if (score > 100) score = 100
-  return score
-}
-
-export default function CampaignSLA() {
-  const [data, setData] = useState([])
-
-  useEffect(() => {
-    fetch("/api/pilgrims", { cache: "no-store" })
-      .then(r => r.json())
-      .then(setData)
-      .catch(() => setData([]))
-  }, [])
-
-  const campaigns = useMemo(() => {
-    const map = new Map()
-
-    for (const p of data) {
-      const cid = String(p.campaign_id ?? p.campaignId ?? p.clinic_location ?? "CAMP-UNKNOWN")
-      const risk = normalizeRiskArabic(p.risk_level ?? p.risk)
-      const e = map.get(cid) ?? { campaign_id: cid, total: 0, critical: 0, medium: 0, low: 0 }
-      e.total += 1
-      e[risk] += 1
-      map.set(cid, e)
+  const rows = useMemo(()=>{
+    const map=new Map()
+    for(const e of events){
+      const cid=String(e.campaign_id ?? "CAMP-UNKNOWN")
+      const arr=map.get(cid)??[]
+      arr.push(e); map.set(cid,arr)
     }
 
-    const arr = Array.from(map.values()).map(c => {
-      const sla = pseudoSLA(c.campaign_id)
-      const score = complianceScore({ ...c, sla })
-      return { ...c, sla, score, grade: grade(score) }
-    })
+    const out=[]
+    for(const [cid,arr] of map.entries()){
+      const raised=arr.filter(e=>e.type==="ALERT_RAISED")
+      const ack=arr.filter(e=>e.type==="ALERT_ACK")
+      const dispatch=arr.filter(e=>e.type==="DISPATCH")
+      const closed=arr.filter(e=>e.type==="CASE_CLOSED")
+      const rec=arr.filter(e=>e.type==="RECOMMENDATION_SENT")
 
-    return arr.sort((a, b) => (a.score - b.score) || (b.critical - a.critical))
-  }, [data])
+      const resp=[], disp=[], clo=[]
+      for(const r of raised){
+        const a=ack.find(x=>x.pilgrim_id===r.pilgrim_id && x.sector===r.sector && new Date(x.ts)>=new Date(r.ts))
+        const d=dispatch.find(x=>x.pilgrim_id===r.pilgrim_id && x.sector===r.sector && new Date(x.ts)>=new Date(r.ts))
+        const c=closed.find(x=>x.pilgrim_id===r.pilgrim_id && x.sector===r.sector && new Date(x.ts)>=new Date(r.ts))
+        if(a) resp.push(mins(r.ts,a.ts))
+        if(d) disp.push(mins(r.ts,d.ts))
+        if(c) clo.push(mins(r.ts,c.ts))
+      }
+      const avg = xs => xs.length? Math.round(xs.reduce((s,v)=>s+(v??0),0)/xs.length) : null
+
+      let recAck=0
+      for(const rr of rec){
+        const a=ack.find(x=>x.pilgrim_id===rr.pilgrim_id && x.sector===rr.sector && new Date(x.ts)>=new Date(rr.ts))
+        if(a) recAck++
+      }
+      const recExec = rec.length ? Math.round((recAck/rec.length)*100) : 0
+
+      // score
+      let score=100
+      const r=avg(resp), d=avg(disp), c=avg(clo)
+      if(r!=null) score -= Math.max(0,r-8)*2
+      if(d!=null) score -= Math.max(0,d-15)*1
+      if(c!=null) score -= Math.max(0,c-45)*1
+      score += Math.round((recExec-70)*0.4)
+      score=Math.max(0,Math.min(100,score))
+
+      out.push({campaign_id:cid, alerts:raised.length, responseMin:r, dispatchMin:d, closeMin:c, recExec, score, grade:grade(score)})
+    }
+
+    out.sort((a,b)=> a.score-b.score)
+    return out
+  },[events])
 
   return (
     <main>
-      <div className="sectionTitle">امتثال الحملات + SLA (Compliance 2.0)</div>
+      <div className="sectionTitle">امتثال الحملات — لوحة مقارنة (SLA Leaderboard)</div>
 
-      <div className="card" style={{ opacity: .82, fontSize: 13, lineHeight: 1.9 }}>
-        هذا النموذج يُظهر الامتثال كمنظومة حوكمة: <b>زمن الاستجابة</b> + <b>تنفيذ التوصيات</b> + <b>مخالفات</b>.
-        القيم الحالية تجريبية (MVP) وسيتم ربطها لاحقاً بأحداث فعلية من مركز التنبيهات وسجل التدقيق.
+      <div className="card" style={{opacity:.82,fontSize:13,lineHeight:1.9}}>
+        ترتيب الحملات حسب الامتثال التشغيلي (SLA): استجابة/إرسال/إغلاق + تنفيذ توصيات.
       </div>
 
-      <div className="sectionTitle">ترتيب الحملات حسب الامتثال</div>
-      <div className="card" style={{ padding: 0 }}>
+      <div className="card" style={{padding:0, marginTop:12}}>
         <table className="table">
           <thead>
             <tr>
-              <th>الحملة</th>
-              <th>الامتثال</th>
-              <th>التصنيف</th>
-              <th>زمن الاستجابة</th>
-              <th>تنفيذ التوصيات</th>
-              <th>مخالفات</th>
-              <th>حرج</th>
-              <th>متوسط</th>
+              <th>الحملة</th><th>الامتثال</th><th>تصنيف</th><th>تنبيهات</th>
+              <th>استجابة</th><th>إرسال</th><th>إغلاق</th><th>تنفيذ</th>
             </tr>
           </thead>
           <tbody>
-            {campaigns.map((c, i) => (
+            {rows.map((c,i)=>(
               <tr key={i}>
-                <td style={{ fontWeight: 900 }}>{c.campaign_id}</td>
-                <td className={c.score < 55 ? "red" : c.score < 70 ? "amber" : "green"} style={{ fontWeight: 900 }}>{c.score}%</td>
-                <td style={{ fontWeight: 900 }}>{c.grade}</td>
-                <td>{c.sla.responseMin} دقيقة</td>
-                <td className={c.sla.complianceExec < 70 ? "amber" : "green"} style={{ fontWeight: 900 }}>{c.sla.complianceExec}%</td>
-                <td className={c.sla.violations ? "red" : "green"} style={{ fontWeight: 900 }}>{c.sla.violations}</td>
-                <td className="red" style={{ fontWeight: 900 }}>{c.critical}</td>
-                <td className="amber" style={{ fontWeight: 900 }}>{c.medium}</td>
+                <td><b>{c.campaign_id}</b></td>
+                <td className={c.score<55?"red":c.score<70?"amber":"green"} style={{fontWeight:900}}>{c.score}%</td>
+                <td style={{fontWeight:900}}>{c.grade}</td>
+                <td>{c.alerts}</td>
+                <td>{c.responseMin==null?"—":`${c.responseMin}د`}</td>
+                <td>{c.dispatchMin==null?"—":`${c.dispatchMin}د`}</td>
+                <td>{c.closeMin==null?"—":`${c.closeMin}د`}</td>
+                <td className={c.recExec<70?"amber":"green"} style={{fontWeight:900}}>{c.recExec}%</td>
               </tr>
             ))}
-
-            {campaigns.length === 0 && (
-              <tr><td colSpan={8} style={{ textAlign: "center", opacity: .6, padding: 18 }}>لا توجد بيانات.</td></tr>
-            )}
+            {rows.length===0 && <tr><td colSpan={8} style={{opacity:.7,padding:14}}>لا توجد بيانات SLA. أضف events.json</td></tr>}
           </tbody>
         </table>
       </div>
