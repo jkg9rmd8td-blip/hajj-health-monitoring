@@ -1,143 +1,113 @@
 "use client"
-
 import { useEffect, useMemo, useState } from "react"
 
-function normalizeRiskArabic(v) {
-  const x = String(v ?? "").trim()
-  if (x.includes("حرج")) return "critical"
-  if (x.includes("متوسط")) return "medium"
-  return "low"
-}
+function norm(v){ const x=String(v??"").trim(); if(x.includes("حرج"))return"critical"; if(x.includes("متوسط"))return"medium"; return"low"; }
+function idx(t,c,m){ if(!t)return 100; let s=100-Math.round((c/t)*100*1.25)-Math.round((m/t)*100*0.55); return Math.max(0,Math.min(100,s)); }
+function band(s){ if(s>=85)return{t:"مستقر",cls:"green"}; if(s>=70)return{t:"مراقبة",cls:"amber"}; return{t:"تأهب",cls:"red"}; }
 
-function readinessIndex(total, critical, medium) {
-  if (!total) return 100
-  const c = (critical / total) * 100
-  const m = (medium / total) * 100
-  let score = 100 - Math.round(c * 1.25) - Math.round(m * 0.55)
-  if (score < 0) score = 0
-  if (score > 100) score = 100
-  return score
-}
+export default function National(){
+  const [data,setData]=useState([])
+  const [events,setEvents]=useState([])
 
-function band(score) {
-  if (score >= 85) return { label: "مستقر", cls: "green" }
-  if (score >= 70) return { label: "مراقبة", cls: "amber" }
-  return { label: "تأهب", cls: "red" }
-}
+  useEffect(()=>{
+    fetch("/api/pilgrims",{cache:"no-store"}).then(r=>r.json()).then(x=>setData(Array.isArray(x)?x:[])).catch(()=>setData([]))
+    fetch("/api/events",{cache:"no-store"}).then(r=>r.json()).then(x=>setEvents(Array.isArray(x)?x:[])).catch(()=>setEvents([]))
+  },[])
 
-function toMashaaer(loc) {
-  const s = String(loc ?? "").toLowerCase()
-  if (s.includes("عرفات")) return "عرفات"
-  if (s.includes("مزدلفة")) return "مزدلفة"
-  if (s.includes("جمر")) return "الجمرات"
-  if (s.includes("منى")) return "منى"
-  return "أخرى"
-}
+  const k = useMemo(()=>{
+    const t=data.length
+    const c=data.filter(p=>norm(p.risk_level??p.risk)==="critical").length
+    const m=data.filter(p=>norm(p.risk_level??p.risk)==="medium").length
+    const s=idx(t,c,m)
+    return {t,c,m,s,b:band(s)}
+  },[data])
 
-export default function National() {
-  const [data, setData] = useState([])
+  const ops = useMemo(()=>{
+    const raised=events.filter(e=>e.type==="ALERT_RAISED")
+    const open = (()=> {
+      // open = raised without CASE_CLOSED for same pilgrim+sector after it
+      const closed=events.filter(e=>e.type==="CASE_CLOSED")
+      let n=0
+      for (const r of raised){
+        const cl = closed.find(c=>c.pilgrim_id===r.pilgrim_id && c.sector===r.sector && new Date(c.ts)>=new Date(r.ts))
+        if(!cl) n++
+      }
+      return n
+    })()
+    return {raised: raised.length, open}
+  },[events])
 
-  useEffect(() => {
-    fetch("/api/pilgrims", { cache: "no-store" })
-      .then(r => r.json())
-      .then(setData)
-      .catch(() => setData([]))
-  }, [])
-
-  const national = useMemo(() => {
-    const total = data.length
-    const critical = data.filter(p => normalizeRiskArabic(p.risk_level ?? p.risk) === "critical").length
-    const medium = data.filter(p => normalizeRiskArabic(p.risk_level ?? p.risk) === "medium").length
-    const score = readinessIndex(total, critical, medium)
-    const b = band(score)
-    return { total, critical, medium, score, ...b }
-  }, [data])
-
-  const mashaaer = useMemo(() => {
-    const map = new Map()
-    for (const p of data) {
-      const key = toMashaaer(p.clinic_location ?? p.location)
-      const risk = normalizeRiskArabic(p.risk_level ?? p.risk)
-      const e = map.get(key) ?? { name: key, total: 0, critical: 0, medium: 0, low: 0 }
-      e.total++
-      e[risk]++
-      map.set(key, e)
+  const actions = useMemo(()=>{
+    const a=[]
+    if(k.s<70){
+      a.push({t:"رفع التأهب الوطني", d:"تعزيز فرق الإسعاف والفرز في القطاعات الأقل جاهزية خلال الذروة."})
+      a.push({t:"إجراءات بيئية", d:"تكثيف التبريد/الرش وتعديل نقاط التموضع وفق بؤر الخطر."})
+      a.push({t:"إدارة الحشود", d:"اقتراح إعادة جدولة بعض تحركات الحملات لتقليل الضغط والإنهاك."})
+    }else if(k.s<85){
+      a.push({t:"مراقبة معززة", d:"تهيئة فرق متنقلة احتياطية ورسائل وقائية للحملات."})
+      a.push({t:"رفع كفاءة التوزيع", d:"تحسين توزيع الموارد حسب اتجاهات القطاعات كل 30 دقيقة."})
+    }else{
+      a.push({t:"استقرار", d:"استمرار الرصد والتحسينات التشغيلية دون تصعيد."})
     }
-
-    const arr = Array.from(map.values()).map(x => {
-      const score = readinessIndex(x.total, x.critical, x.medium)
-      const b = band(score)
-      return { ...x, score, bandLabel: b.label, bandClass: b.cls }
-    })
-
-    return arr.sort((a, b) => a.score - b.score)
-  }, [data])
-
-  const actions = useMemo(() => {
-    const items = []
-    if (national.score < 70) {
-      items.push("رفع مستوى التأهب الوطني: تعزيز فرق الإسعاف في القطاعات الأقل جاهزية.")
-      items.push("تفعيل إجراءات بيئية: زيادة التبريد/الرش في بؤر الخطر خلال الذروة.")
-      items.push("تنبيه الحملات: توجيه وقائي إلزامي للمجموعات عالية الخطورة.")
-    } else if (national.score < 85) {
-      items.push("رفع المراقبة: زيادة نقاط الفرز وتفعيل رسائل وقائية للحملات.")
-      items.push("تجهيز فرق متنقلة احتياطية قرب القطاعات ذات الجاهزية المتوسطة.")
-    } else {
-      items.push("المنظومة مستقرة: الاستمرار في الرصد وتحسين توزيع الموارد حسب الاتجاهات.")
-    }
-    return items
-  }, [national])
+    return a
+  },[k])
 
   return (
     <main>
-      <div className="sectionTitle">المؤشر الوطني للجاهزية الصحية (National Readiness Index)</div>
+      <div className="split" style={{marginTop:10}}>
+        <div>
+          <div className="sectionTitle" style={{margin:0}}>المؤشر الوطني للجاهزية الصحية</div>
+          <div style={{opacity:.75,fontSize:13,lineHeight:1.8}}>ملخص سيادي لحالة اليوم + قرارات تشغيلية فورية.</div>
+        </div>
+        <span className="badge">قضايا مفتوحة: <b className={ops.open? "amber":"green"}>{ops.open}</b></span>
+      </div>
 
-      <div className="grid2">
+      <div className="grid4" style={{marginTop:14}}>
+        <div className="card"><div className="kpiLabel">الجاهزية الوطنية</div><div className={"kpiValue "+k.b.cls}>{k.s}%</div></div>
+        <div className="card"><div className="kpiLabel">حالات حرجة</div><div className="kpiValue red">{k.c}</div></div>
+        <div className="card"><div className="kpiLabel">حالات متوسطة</div><div className="kpiValue amber">{k.m}</div></div>
+        <div className="card"><div className="kpiLabel">تنبيهات مرفوعة</div><div className="kpiValue">{ops.raised}</div></div>
+      </div>
+
+      <div className="grid3" style={{marginTop:12}}>
         <div className="card">
-          <div className="kpiLabel">جاهزية المنظومة الوطنية</div>
-          <div className={"kpiValue " + national.cls}>{national.score}%</div>
-          <div style={{ marginTop: 10, opacity: .75, fontSize: 13 }}>
-            الحالة: <b>{national.label}</b> — إجمالي {national.total} — حرجة <b className="red">{national.critical}</b> — متوسطة <b className="amber">{national.medium}</b>
+          <div className="kpiLabel">حالة اليوم</div>
+          <div className={"kpiValue "+k.b.cls}>{k.b.t}</div>
+          <div style={{opacity:.75,fontSize:13,lineHeight:1.8,marginTop:8}}>
+            هذا التقييم مبني على توزيع المخاطر (حرج/متوسط) على مستوى المنظومة.
           </div>
         </div>
 
         <div className="card">
-          <div className="kpiLabel">توصيات سيادية فورية</div>
-          <ol style={{ margin: 0, paddingRight: 18, opacity: .9, lineHeight: 2, fontSize: 13 }}>
-            {actions.map((a, i) => <li key={i}>{a}</li>)}
-          </ol>
-        </div>
-      </div>
-
-      <div className="sectionTitle">جاهزية المشاعر (ملخص قيادي)</div>
-      <div className="card" style={{ padding: 0 }}>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>المشعر</th>
-              <th>الجاهزية</th>
-              <th>الحالة</th>
-              <th>إجمالي</th>
-              <th>حرج</th>
-              <th>متوسط</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mashaaer.map((m, i) => (
-              <tr key={i}>
-                <td style={{ fontWeight: 900 }}>{m.name}</td>
-                <td className={m.bandClass} style={{ fontWeight: 900 }}>{m.score}%</td>
-                <td>{m.bandLabel}</td>
-                <td>{m.total}</td>
-                <td className="red" style={{ fontWeight: 900 }}>{m.critical}</td>
-                <td className="amber" style={{ fontWeight: 900 }}>{m.medium}</td>
-              </tr>
+          <div className="kpiLabel">قرارات تنفيذية (Auto)</div>
+          <div style={{display:"grid",gap:10,marginTop:10}}>
+            {actions.map((x,i)=>(
+              <div key={i} className="tile">
+                <div style={{fontWeight:900}}>{x.t}</div>
+                <div style={{opacity:.8,fontSize:13,lineHeight:1.8,marginTop:6}}>{x.d}</div>
+              </div>
             ))}
-            {mashaaer.length === 0 && (
-              <tr><td colSpan={6} style={{ textAlign: "center", opacity: .6, padding: 18 }}>لا توجد بيانات.</td></tr>
-            )}
-          </tbody>
-        </table>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="kpiLabel">تقرير سريع</div>
+          <div className="tile" style={{marginTop:10,opacity:.85,fontSize:13,lineHeight:1.9}}>
+            الجاهزية الوطنية: <b className={k.b.cls}>{k.s}%</b> ({k.b.t})<br/>
+            حرجة: <b className="red">{k.c}</b> — متوسطة: <b className="amber">{k.m}</b><br/>
+            قضايا مفتوحة: <b className={ops.open? "amber":"green"}>{ops.open}</b>
+          </div>
+          <button className="btn" style={{marginTop:10}} onClick={()=>{
+            const text =
+`تقرير قيادي — الجاهزية الوطنية
+الجاهزية: ${k.s}% (${k.b.t})
+حرجة: ${k.c} | متوسطة: ${k.m}
+تنبيهات: ${ops.raised} | قضايا مفتوحة: ${ops.open}
+قرارات فورية:
+- ${actions.map(a=>a.t+": "+a.d).join("\n- ")}`
+            navigator.clipboard?.writeText(text); alert("تم نسخ التقرير ✅")
+          }}>نسخ تقرير قيادي</button>
+        </div>
       </div>
     </main>
   )
