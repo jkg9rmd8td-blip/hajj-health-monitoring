@@ -40,7 +40,19 @@ body {
 .status-warning {
   color: var(--warning);
 }
+.card {
+  background: rgba(17, 24, 39, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 20px;
+  transition: all 0.3s ease;
+}
 
+.card:hover {
+  border-color: rgba(0, 255, 255, 0.3);
+  transform: translateY(-4px);
+}
 .status-stable {
   color: var(--success);
 }
