@@ -72,7 +72,7 @@ export default function Home() {
                 <td>{p.name ?? "—"}</td>
                 <td>{p.location ?? "—"}</td>
                 <td>{p.temperature ?? "—"}</td>
-                <td className="red" style={{ fontWeight: 800 }}>{p.heartRate ?? "—"}</td>
+                <td className="red" style={{ fontWeight: 900 }}>{p.heartRate ?? "—"}</td>
               </tr>
             ))}
 
