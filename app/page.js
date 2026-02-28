@@ -1,114 +1,100 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
-export default function VisionCommand() {
-
+export default function Home() {
   const [data, setData] = useState([])
-  const [count, setCount] = useState(0)
 
   useEffect(() => {
     fetch("/api/pilgrims")
-      .then(res => res.json())
-      .then(json => {
-        setData(json)
-        animateCounter(json.length)
-      })
+      .then((r) => r.json())
+      .then(setData)
       .catch(() => setData([]))
   }, [])
 
-  const total = data.length
-  const critical = data.filter(p => p.risk === "critical").length
-  const stability = total ? 100 - Math.round((critical / total) * 100) : 100
+  const stats = useMemo(() => {
+    const total = data.length
+    const critical = data.filter(p => p.risk === "critical").length
+    const medium = data.filter(p => p.risk === "medium").length
+    const low = data.filter(p => p.risk === "low").length
+    const stability = total ? 100 - Math.round((critical / total) * 100) : 100
+    return { total, critical, medium, low, stability }
+  }, [data])
 
-  function animateCounter(target) {
-    let start = 0
-    const interval = setInterval(() => {
-      start += Math.ceil(target / 20)
-      if (start >= target) {
-        start = target
-        clearInterval(interval)
-      }
-      setCount(start)
-    }, 30)
-  }
+  const criticalRows = data
+    .filter(p => p.risk === "critical")
+    .slice(0, 8)
 
   return (
-    <main className="min-h-screen p-16 relative">
+    <main>
+      <div className="grid4" style={{ marginTop: 18 }}>
+        <KPI label="إجمالي الحجاج تحت المراقبة" value={stats.total} />
+        <KPI label="حالات حرجة" value={stats.critical} tone="red" />
+        <KPI label="حالات متوسطة" value={stats.medium} tone="amber" />
+        <KPI label="حالات منخفضة" value={stats.low} tone="green" />
+      </div>
 
-      {/* Ambient Glow */}
-      <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-blue-500 opacity-10 blur-[200px] rounded-full"></div>
-
-      {/* Header */}
-      <div className="flex justify-between items-center mb-20 relative z-10">
-
-        <div>
-          <h1 className="text-5xl font-semibold tracking-tight">
-            Hajj Vision Command
-          </h1>
-          <div className="flex items-center gap-3 mt-3 opacity-60">
-            <div className="status-orb"></div>
-            System Online
+      <div className="grid2" style={{ marginTop: 14 }}>
+        <div className="card">
+          <div className="kpiLabel">مؤشر استقرار المنظومة الصحية</div>
+          <div className={"kpiValue " + (stats.stability >= 85 ? "green" : stats.stability >= 70 ? "amber" : "red")}>
+            {stats.stability}%
+          </div>
+          <div style={{ marginTop: 12, opacity: .7, fontSize: 13 }}>
+            يعتمد المؤشر على نسبة الحالات الحرجة من إجمالي الحالات المراقَبة.
           </div>
         </div>
 
-        <div className="deep-glass px-8 py-6 soft-shadow glow float">
-          <div className="opacity-60 text-sm">System Stability</div>
-          <div className="kpi-number text-blue-400">{stability}%</div>
-        </div>
-
-      </div>
-
-      {/* KPI Grid */}
-      <div className="grid md:grid-cols-3 gap-12 relative z-10">
-
-        <Card title="Total Pilgrims" value={count} />
-        <Card title="Critical Cases" value={critical} highlight />
-        <Card title="Monitored" value={total - critical} />
-
-      </div>
-
-      {/* Live Feed */}
-      <div className="mt-24 deep-glass p-12 soft-shadow float relative z-10">
-        <h2 className="text-2xl mb-8 opacity-70">
-          Real-Time Critical Stream
-        </h2>
-
-        <div className="space-y-6">
-          {data.filter(p => p.risk === "critical").map((p, i) => (
-            <div
-              key={i}
-              className="glass px-8 py-6 flex justify-between items-center float"
-            >
-              <div>
-                <div className="text-lg">{p.name}</div>
-                <div className="opacity-50 text-sm">{p.location}</div>
-              </div>
-              <div className="text-red-400 text-xl font-semibold">
-                {p.heartRate} BPM
-              </div>
-            </div>
-          ))}
-
-          {critical === 0 && (
-            <div className="opacity-40 text-center py-16">
-              All systems stable. No critical cases.
-            </div>
-          )}
+        <div className="card">
+          <div className="kpiLabel">ملخص تشغيلي</div>
+          <ul style={{ margin: 0, paddingRight: 18, opacity: .85, lineHeight: 1.9, fontSize: 13 }}>
+            <li>تحديث البيانات تلقائيًا من واجهة الخدمة الداخلية.</li>
+            <li>أولوية الاستجابة للحالات الحرجة وفق مسار الفرز الطبي.</li>
+            <li>إتاحة التقارير التنفيذية للقيادات عبر وضع “التنفيذي”.</li>
+          </ul>
         </div>
       </div>
 
+      <div className="sectionTitle">الحالات الحرجة (عرض سريع)</div>
+      <div className="card" style={{ padding: 0 }}>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>الاسم</th>
+              <th>الموقع</th>
+              <th>الحرارة</th>
+              <th>النبض</th>
+            </tr>
+          </thead>
+          <tbody>
+            {criticalRows.map((p, i) => (
+              <tr key={i}>
+                <td>{p.name ?? "—"}</td>
+                <td>{p.location ?? "—"}</td>
+                <td>{p.temperature ?? "—"}</td>
+                <td className="red" style={{ fontWeight: 800 }}>{p.heartRate ?? "—"}</td>
+              </tr>
+            ))}
+
+            {criticalRows.length === 0 && (
+              <tr>
+                <td colSpan={4} style={{ textAlign: "center", opacity: .6, padding: 18 }}>
+                  لا توجد حالات حرجة حالياً.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </main>
   )
 }
 
-function Card({ title, value, highlight }) {
+function KPI({ label, value, tone }) {
   return (
-    <div className="glass p-12 soft-shadow float">
-      <div className="opacity-50 mb-3">{title}</div>
-      <div className={`kpi-number ${highlight ? "text-red-400" : ""}`}>
-        {value}
-      </div>
+    <div className="card">
+      <div className="kpiLabel">{label}</div>
+      <div className={"kpiValue " + (tone || "")}>{value}</div>
     </div>
   )
 }
