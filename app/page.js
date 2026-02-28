@@ -5,107 +5,67 @@ import { useEffect, useState } from "react"
 export default function CommandCenter() {
 
   const [data, setData] = useState([])
-  const [alert, setAlert] = useState(false)
-
-  const fetchData = async () => {
-    try {
-      const res = await fetch("/api/pilgrims")
-      const json = await res.json()
-      setData(json)
-
-      const criticalCases = json.filter(p => p.risk === "critical")
-      if (criticalCases.length > 5) {
-        setAlert(true)
-        playAlarm()
-      } else {
-        setAlert(false)
-      }
-
-    } catch (err) {
-      console.error(err)
-    }
-  }
 
   useEffect(() => {
-    fetchData()
-    const interval = setInterval(fetchData, 5000)
-    return () => clearInterval(interval)
+    fetch("/api/pilgrims")
+      .then(res => res.json())
+      .then(setData)
+      .catch(() => setData([]))
   }, [])
 
   const total = data.length
   const critical = data.filter(p => p.risk === "critical").length
-  const avgTemp = total
-    ? (data.reduce((sum, p) => sum + p.temperature, 0) / total).toFixed(1)
-    : 0
-
-  const stabilityIndex = total
-    ? 100 - Math.round((critical / total) * 100)
-    : 100
-
-  function playAlarm() {
-    const audio = new Audio("/alarm.mp3")
-    audio.play()
-  }
+  const stability = total ? 100 - Math.round((critical / total) * 100) : 100
 
   return (
-    <main className="min-h-screen bg-black text-white p-8">
+    <main className="min-h-screen p-12">
 
-      {/* Top Bar */}
-      <div className="flex justify-between items-center mb-10">
-        <h1 className="text-3xl font-bold">
-          🚨 غرفة عمليات الحج الذكية
+      {/* Header */}
+      <div className="flex justify-between items-center mb-16">
+        <h1 className="title-hero">
+          Hajj Health Command Center
         </h1>
 
-        <div className="flex gap-6 text-sm">
-          <span>إجمالي الحجاج: {total}</span>
-          <span>متوسط الحرارة: {avgTemp}°</span>
-          <span className="text-green-400">
-            استقرار النظام: {stabilityIndex}%
-          </span>
+        <div className="glass px-6 py-3 soft-shadow smooth">
+          <span className="text-sm opacity-70">System Stability</span>
+          <div className="kpi-value">{stability}%</div>
         </div>
       </div>
 
-      {/* Alert */}
-      {alert && (
-        <div className="bg-red-600 text-center py-4 rounded-xl mb-8 animate-pulse">
-          ⚠ ارتفاع عدد الحالات الحرجة – يلزم تدخل فوري
-        </div>
-      )}
+      {/* KPI Grid */}
+      <div className="grid md:grid-cols-3 gap-10">
 
-      {/* Grid */}
-      <div className="grid md:grid-cols-3 gap-6">
-
-        <Card title="حالات حرجة" value={critical} color="text-red-500" />
-        <Card title="إجهاد حراري متوقع" value={`${Math.round(critical * 1.3)}`} color="text-orange-400" />
-        <Card title="معدل نبض مرتفع" value={data.filter(p => p.heartRate > 110).length} color="text-yellow-400" />
+        <GlassCard title="Total Pilgrims" value={total} />
+        <GlassCard title="Critical Cases" value={critical} highlight />
+        <GlassCard title="Active Monitoring" value={total - critical} />
 
       </div>
 
-      {/* Critical Live Feed */}
-      <div className="mt-12">
-        <h2 className="text-xl mb-4">البث الحي للحالات الحرجة</h2>
+      {/* Live Section */}
+      <div className="mt-20 glass p-10 soft-shadow smooth">
+        <h2 className="text-xl mb-6 opacity-80">
+          Live Critical Feed
+        </h2>
 
-        <div className="bg-zinc-900 rounded-2xl overflow-hidden">
-          <table className="w-full text-right">
-            <thead className="bg-zinc-800">
-              <tr>
-                <th className="p-3">الاسم</th>
-                <th className="p-3">الموقع</th>
-                <th className="p-3">الحرارة</th>
-                <th className="p-3">النبض</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.filter(p => p.risk === "critical").map((p, i) => (
-                <tr key={i} className="border-t border-zinc-800">
-                  <td className="p-3">{p.name}</td>
-                  <td className="p-3">{p.location}</td>
-                  <td className="p-3 text-orange-400">{p.temperature}°</td>
-                  <td className="p-3 text-red-500 font-bold">{p.heartRate}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-4">
+          {data.filter(p => p.risk === "critical").map((p, i) => (
+            <div
+              key={i}
+              className="flex justify-between items-center glass px-6 py-4 smooth hover:scale-[1.01]"
+            >
+              <span>{p.name}</span>
+              <span className="opacity-60">{p.location}</span>
+              <span className="text-red-400 font-semibold">
+                {p.heartRate} BPM
+              </span>
+            </div>
+          ))}
+
+          {critical === 0 && (
+            <div className="opacity-50 text-center py-10">
+              All systems stable.
+            </div>
+          )}
         </div>
       </div>
 
@@ -113,11 +73,11 @@ export default function CommandCenter() {
   )
 }
 
-function Card({ title, value, color }) {
+function GlassCard({ title, value, highlight }) {
   return (
-    <div className="bg-zinc-900 p-6 rounded-2xl shadow-lg">
-      <div className="text-gray-400 mb-2">{title}</div>
-      <div className={`text-4xl font-bold ${color}`}>
+    <div className={`glass p-10 soft-shadow smooth hover:scale-[1.02]`}>
+      <div className="opacity-60 mb-2">{title}</div>
+      <div className={`kpi-value ${highlight ? "text-red-400" : ""}`}>
         {value}
       </div>
     </div>
