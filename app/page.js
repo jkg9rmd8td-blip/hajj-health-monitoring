@@ -24,21 +24,19 @@ export default function Home() {
     <main className="min-h-screen flex justify-center px-4 py-10">
       <div className="w-full max-w-6xl space-y-8">
 
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="rounded-3xl border border-borderGlass bg-glass backdrop-blur-xl p-8 shadow-[0_0_60px_rgba(0,0,0,0.45)]"
         >
           <h1 className="text-4xl font-semibold text-slate-100">
-‎            منصة رصد الصحة في الحج
+            منصة رصد الصحة في الحج
           </h1>
           <p className="mt-2 text-slate-300">
-‎            منصة تنفيذية بتصميم فخم مستوحى من Apple VisionOS
+            منصة تنفيذية بتصميم فخم مستوحى من Apple VisionOS
           </p>
         </motion.div>
 
-        {/* KPIs */}
         <div className="grid gap-4 md:grid-cols-4">
           <Kpi label="إجمالي الحالات" value={total} />
           <Kpi label="الحالات الحرجة" value={critical} color="red" />
@@ -48,7 +46,6 @@ export default function Home() {
 
         <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
 
-          {/* Table */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -56,10 +53,10 @@ export default function Home() {
           >
             <div className="p-6 border-b border-borderGlass">
               <h2 className="text-lg font-semibold text-slate-100">
-‎                سجل الحالات الصحية
+                سجل الحالات الصحية
               </h2>
               <p className="text-sm text-slate-400 mt-1">
-‎                بيانات تجريبية لعرض الفكرة التنفيذية.
+                بيانات تجريبية لعرض الفكرة التنفيذية.
               </p>
             </div>
 
@@ -96,14 +93,13 @@ export default function Home() {
             </div>
           </motion.div>
 
-          {/* Chart */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="rounded-3xl border border-borderGlass bg-glass backdrop-blur-xl p-6 shadow-[0_0_60px_rgba(0,0,0,0.45)]"
           >
             <h2 className="text-lg font-semibold text-slate-100 mb-4">
-‎              توزيع الحالات حسب الخطورة
+              توزيع الحالات حسب الخطورة
             </h2>
 
             <div className="flex items-end gap-4 h-48">
@@ -153,9 +149,9 @@ function Td({ children }) {
 
 function Risk({ level }) {
   const colors = {
-‎    منخفضة: "text-emerald-300 border-emerald-500/40 bg-emerald-500/10",
-‎    متوسطة: "text-amber-300 border-amber-500/40 bg-amber-500/10",
-‎    حرجة: "text-rose-300 border-rose-500/40 bg-rose-500/10"
+    منخفضة: "text-emerald-300 border-emerald-500/40 bg-emerald-500/10",
+    متوسطة: "text-amber-300 border-amber-500/40 bg-amber-500/10",
+    حرجة: "text-rose-300 border-rose-500/40 bg-rose-500/10"
   };
 
   return (
