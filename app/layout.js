@@ -2,8 +2,8 @@ import "./globals.css"
 import Link from "next/link"
 
 export const metadata = {
-  title: "المركز الوطني لمراقبة صحة الحجاج",
-  description: "منصة رسمية لرصد وتحليل المؤشرات الصحية لضيوف الرحمن لحظياً",
+  title: "منصة المسار الصحي التنبؤية — غرفة العمليات الوطنية",
+  description: "منصة سيادية لرصد المخاطر الصحية لضيوف الرحمن لحظياً ودعم القرار التشغيلي",
 }
 
 export default function RootLayout({ children }) {
@@ -16,39 +16,46 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body>
+        {/* شريط علوي رسمي */}
         <div className="officialTopbar">
           <div className="topbarRow">
             <span>المملكة العربية السعودية</span>
-            <span>وزارة الصحة</span>
-            <span>موسم حج 1447هـ</span>
+            <span>وزارة الصحة — وزارة الحج والعمرة</span>
+            <span>الحج الذكي</span>
           </div>
         </div>
 
         <div className="shell">
+          {/* رأس المنصة */}
           <div className="navbar">
             <div className="brand">
-              <div className="brandTitle">المركز الوطني لمراقبة صحة الحجاج</div>
-              <div className="brandSub">غرفة عمليات رقمية لرصد المخاطر الصحية لحظياً</div>
+              <div className="brandTitle">منصة المسار الصحي التنبؤية</div>
+              <div className="brandSub">غرفة عمليات وطنية لرصد المخاطر الصحية والتوجيه الاستباقي</div>
             </div>
 
+            {/* ترتيب قيادي: قيادة → تشغيل → حوكمة */}
             <nav className="navlinks">
-              <Link className="navlink" href="/sectors">القطاعات</Link>
-              <Link className="navlink" href="/">الرئيسية</Link>
-              <Link className="navlink" href="/analytics">التحليلات</Link>
-              <Link className="navlink" href="/map">الخريطة</Link>
-              <Link className="navlink" href="/alerts">التنبيهات</Link>
-              <Link className="navlink" href="/pilgrims">الحجاج</Link>
-              <Link className="navlink" href="/executive">التنفيذي</Link>
-              <Link className="navlink" href="/system">النظام</Link>
+              <Link className="navlink" href="/">القيادة</Link>
               <Link className="navlink" href="/national">المؤشر الوطني</Link>
-<Link className="navlink" href="/campaigns-sla">امتثال SLA</Link>
+              <Link className="navlink" href="/sectors">القطاعات</Link>
+              <Link className="navlink" href="/map">الخريطة</Link>
+
+              <Link className="navlink" href="/analytics">التحليلات</Link>
+              <Link className="navlink" href="/operations">التشغيل</Link>
+              <Link className="navlink" href="/alerts">التنبيهات</Link>
+
               <Link className="navlink" href="/campaigns">الحملات</Link>
-<Link className="navlink" href="/operations">التشغيل</Link>
-<Link className="navlink" href="/audit">التدقيق</Link>
+              <Link className="navlink" href="/campaigns-sla">امتثال SLA</Link>
+              <Link className="navlink" href="/audit">التدقيق</Link>
             </nav>
           </div>
 
           {children}
+
+          {/* تذييل رسمي */}
+          <div style={{ marginTop: 26, opacity: .65, fontSize: 12 }}>
+            © {new Date().getFullYear()} — منصة تشغيلية تجريبية قابلة للتوسع — بيانات مجهولة الهوية لأغراض السلامة.
+          </div>
         </div>
       </body>
     </html>
