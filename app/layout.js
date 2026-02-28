@@ -1,57 +1,118 @@
-import "./globals.css"
-import Link from "next/link"
+"use client"
 
-export const metadata = {
-  title: "منصة المسار الصحي التنبؤية — غرفة العمليات الوطنية",
-  description: "منصة سيادية لرصد المخاطر الصحية لضيوف الرحمن لحظياً ودعم القرار التشغيلي",
-}
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+
+export const dynamic = "force-dynamic"
+
+const role = "NATIONAL_ADMIN" // لاحقاً يتحول إلى نظام صلاحيات حقيقي
 
 export default function RootLayout({ children }) {
+
+  const pathname = usePathname()
+
+  const nav = [
+    { name: "الرئيسية", path: "/" },
+    { name: "الخريطة التشغيلية", path: "/map" },
+    { name: "الحملات", path: "/campaigns" },
+    { name: "القطاعات", path: "/sectors" },
+    { name: "المحاكاة", path: "/simulation" },
+    { name: "الموارد", path: "/resources" },
+    { name: "التحليلات", path: "/analytics" }
+  ]
+
   return (
     <html lang="ar" dir="rtl">
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700;800;900&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body>
-        <div className="officialTopbar">
-          <div className="topbarRow">
-            <span>المملكة العربية السعودية</span>
-            <span>وزارة الصحة — وزارة الحج والعمرة</span>
-            <span>الحج الذكي</span>
-          </div>
-        </div>
+      <body style={{
+        margin: 0,
+        background: "#0B1220",
+        color: "white",
+        fontFamily: "system-ui"
+      }}>
 
-        <div className="shell">
-          <div className="navbar">
-            <div className="brand">
-              <div className="brandTitle">منصة المسار الصحي التنبؤية</div>
-              <div className="brandSub">غرفة عمليات وطنية لرصد المخاطر والتوجيه الاستباقي</div>
+        <div style={{ display: "flex", minHeight: "100vh" }}>
+
+          {/* Sidebar */}
+          <aside style={{
+            width: 260,
+            background: "#111827",
+            padding: 20,
+            borderLeft: "1px solid rgba(255,255,255,0.08)"
+          }}>
+
+            <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 30 }}>
+              🇸🇦 منصة المسار الصحي
             </div>
 
-            <nav className="navlinks">
-              <Link className="navlink" href="/">القيادة</Link>
-              <Link className="navlink" href="/national">المؤشر الوطني</Link>
-              <Link className="navlink" href="/sectors">القطاعات</Link>
-              <Link className="navlink" href="/map">الخريطة</Link>
+            <div style={{ display: "grid", gap: 8 }}>
+              {nav.map((item, i) => (
+                <Link key={i} href={item.path}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    textDecoration: "none",
+                    color: pathname === item.path ? "#38BDF8" : "#D1D5DB",
+                    background: pathname === item.path ? "rgba(56,189,248,0.08)" : "transparent"
+                  }}>
+                  {item.name}
+                </Link>
+              ))}
+            </div>
 
-              <Link className="navlink" href="/operations">التشغيل</Link>
-              <Link className="navlink" href="/campaigns">الحملات</Link>
-              <Link className="navlink" href="/ai-ops">AI-Ops</Link>
-              <Link className="navlink" href="/campaigns-sla">امتثال SLA</Link>
-              <Link className="navlink" href="/audit">التدقيق</Link>
-              <Link className="navlink" href="/movement">التحركات</Link>
-            </nav>
-          </div>
+            <div style={{
+              marginTop: 40,
+              padding: 12,
+              background: "rgba(255,255,255,0.05)",
+              borderRadius: 8,
+              fontSize: 13
+            }}>
+              الدور الحالي:
+              <div style={{ fontWeight: 700, marginTop: 4 }}>
+                {role}
+              </div>
+            </div>
 
-          {children}
+          </aside>
 
-          <div className="footerNote">
-            © {new Date().getFullYear()} — منصة تشغيلية تجريبية قابلة للتوسع — بيانات مجهولة الهوية لأغراض السلامة.
+          {/* Main */}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+
+            {/* Top Bar */}
+            <header style={{
+              height: 70,
+              background: "#0F172A",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "0 24px",
+              borderBottom: "1px solid rgba(255,255,255,0.08)"
+            }}>
+              <div style={{ fontWeight: 700 }}>
+                غرفة العمليات الوطنية
+              </div>
+
+              <div style={{
+                padding: "6px 14px",
+                background: "rgba(34,197,94,0.15)",
+                borderRadius: 20,
+                fontSize: 13
+              }}>
+                مستوى التأهب: مستقر
+              </div>
+            </header>
+
+            {/* Page Content */}
+            <main style={{
+              flex: 1,
+              padding: 30,
+              overflowY: "auto"
+            }}>
+              {children}
+            </main>
+
           </div>
         </div>
+
       </body>
     </html>
   )
