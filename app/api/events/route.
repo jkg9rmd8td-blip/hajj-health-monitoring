@@ -1,0 +1,5 @@
+import events from "../pilgrims/events.json";
+
+export function GET() {
+  return Response.json(Array.isArray(events) ? events : []);
+}
